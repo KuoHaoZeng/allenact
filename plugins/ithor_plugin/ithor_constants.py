@@ -10,6 +10,13 @@ ROTATE_RIGHT = "RotateRight"
 LOOK_DOWN = "LookDown"
 LOOK_UP = "LookUp"
 END = "End"
+HandUX = "MoveHandUX"
+HandUY = "MoveHandUY"
+HandUZ = "MoveHandUZ"
+HandDX = "MoveHandDX"
+HandDY = "MoveHandDY"
+HandDZ = "MoveHandDZ"
+
 
 VISIBILITY_DISTANCE = 1.25
 FOV = 90.0

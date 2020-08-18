@@ -280,7 +280,9 @@ class IThorEnvironment(object):
     ) -> None:
         """Helper function teleporting the agent to a given location."""
         if standing is None:
-            standing = self.last_event.metadata["isStanding"]
+            standing = self.last_event.metadata.get(
+                "isStanding", self.last_event.metadata["agent"]["isStanding"]
+            )
         original_location = self.get_agent_location()
         target = {"x": x, "y": y, "z": z}
         if only_initially_reachable is None:
@@ -532,7 +534,7 @@ class IThorEnvironment(object):
             "z": metadata["agent"]["position"]["z"],
             "rotation": metadata["agent"]["rotation"]["y"],
             "horizon": metadata["agent"]["cameraHorizon"],
-            "standing": metadata["isStanding"],
+            "standing": metadata.get("isStanding", metadata["agent"]["isStanding"]),
         }
         return location
 
@@ -1082,3 +1084,245 @@ class IThorEnvironment(object):
             return nx.shortest_path_length(self.graph, source_state_key, goal_state_key)
         except nx.NetworkXNoPath as _:
             return float("inf")
+
+
+MOVE_HAND_CONSTANT = 0.1
+
+class IThorObjManipEnvironment(IThorEnvironment):
+    """Wrapper for the ai2thor controller providing additional functionality
+    and bookkeeping.
+
+    See [here](https://ai2thor.allenai.org/documentation/installation) for comprehensive
+     documentation on AI2-THOR.
+
+    # Attributes
+
+    controller : The ai2thor controller.
+    """
+    def __init__(
+        self,
+        x_display: Optional[str] = None,
+        docker_enabled: bool = False,
+        local_thor_build: Optional[str] = None,
+        visibility_distance: float = VISIBILITY_DISTANCE,
+        fov: float = FOV,
+        player_screen_width: int = 300,
+        player_screen_height: int = 300,
+        quality: str = "Very Low",
+        restrict_to_initially_reachable_points: bool = False,
+        make_agents_visible: bool = True,
+        object_open_speed: float = 1.0,
+        simplify_physics: bool = False,
+    ) -> None:
+        """
+        """
+        self._start_player_screen_width = player_screen_width
+        self._start_player_screen_height = player_screen_height
+        self._local_thor_build = local_thor_build
+        self.x_display = x_display
+        self.controller: Optional[Controller] = None
+        self._started = False
+        self._quality = quality
+
+        self._initially_reachable_points: Optional[List[Dict]] = None
+        self._initially_reachable_points_set: Optional[Set[Tuple[float, float]]] = None
+        self._move_mag: Optional[float] = None
+        self._grid_size: Optional[float] = None
+        self._visibility_distance = visibility_distance
+        self._fov = fov
+        self.restrict_to_initially_reachable_points = (
+            restrict_to_initially_reachable_points
+        )
+        self.make_agents_visible = make_agents_visible
+        self.object_open_speed = object_open_speed
+        self._always_return_visible_range = False
+        self.simplify_physics = simplify_physics
+
+        self.start(None)
+        # noinspection PyTypeHints
+        self.controller.docker_enabled = docker_enabled  # type: ignore
+
+    def start(
+        self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
+    ) -> None:
+        """Starts the ai2thor controller if it was previously stopped.
+        """
+        if self._started:
+            raise RuntimeError(
+                "Trying to start the environment but it is already started."
+            )
+
+        def create_controller():
+            return Controller(
+                x_display=self.x_display,
+                player_screen_width=self._start_player_screen_width,
+                player_screen_height=self._start_player_screen_height,
+                local_executable_path=self._local_thor_build,
+                quality=self._quality,
+                agentControllerType='mid-level',
+                agentMode='arm',
+            )
+
+        self.controller = create_controller()
+
+        if (
+            self._start_player_screen_height,
+            self._start_player_screen_width,
+        ) != self.current_frame.shape[:2]:
+            self.controller.step(
+                {
+                    "action": "ChangeResolution",
+                    "x": self._start_player_screen_width,
+                    "y": self._start_player_screen_height,
+                }
+            )
+
+        self._started = True
+        self.reset(scene_name=scene_name, move_mag=move_mag, **kwargs)
+
+    def reset(
+        self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
+    ):
+        self._move_mag = move_mag
+        self._grid_size = self._move_mag
+
+        if scene_name is None:
+            scene_name = self.controller.last_event.metadata["sceneName"]
+        self.controller.reset(scene_name)
+
+        self.controller.step(
+            {
+                "action": "Initialize",
+                "gridSize": self._grid_size,
+                "visibilityDistance": self._visibility_distance,
+                "fov": self._fov,
+                "makeAgentsVisible": self.make_agents_visible,
+                "alwaysReturnVisibleRange": self._always_return_visible_range,
+                'agentControllerType': 'physics',
+                **kwargs,
+            }
+        )
+
+        if self.object_open_speed != 1.0:
+            self.controller.step(
+                {"action": "ChangeOpenSpeed", "x": self.object_open_speed}
+            )
+
+        self._initially_reachable_points = None
+        self._initially_reachable_points_set = None
+        self.controller.step({"action": "GetReachablePositions"})
+        if not self.controller.last_event.metadata["lastActionSuccess"]:
+            warnings.warn(
+                "Error when getting reachable points: {}".format(
+                    self.controller.last_event.metadata["errorMessage"]
+                )
+            )
+        self._initially_reachable_points = self.last_action_return
+
+    def randomize_agent_location(
+        self, seed: int = None, partial_position: Optional[Dict[str, float]] = None
+    ) -> Dict: #TODO for first stage only if object is visible
+        """Teleports the agent to a random reachable location in the scene."""
+        if partial_position is None:
+            partial_position = {}
+        k = 0
+        state: Optional[Dict] = None
+
+        while k == 0 or (not self.last_action_success and k < 10):
+            state = self.random_reachable_state(seed=seed)
+            self.teleport_agent_to(**{**state, **partial_position})
+            k += 1
+
+        if not self.last_action_success:
+            warnings.warn(
+                (
+                    "Randomize agent location in scene {}"
+                    " with seed {} and partial position {} failed in "
+                    "10 attempts. Forcing the action."
+                ).format(self.scene_name, seed, partial_position)
+            )
+            self.teleport_agent_to(**{**state, **partial_position}, force_action=True)  # type: ignore
+            assert self.last_action_success
+
+        assert state is not None
+        return state
+
+    def object_in_hand(self):
+        """Object metadata for the object in the agent's hand."""
+        inv_objs = self.last_event.metadata["inventoryObjects"]
+        if len(inv_objs) == 0:
+            return None
+        elif len(inv_objs) == 1:
+            return self.get_object_by_id(
+                self.last_event.metadata["inventoryObjects"][0]["objectId"]
+            )
+        else:
+            raise AttributeError("Must be <= 1 inventory objects.")
+
+    def step(
+        self, action_dict: Dict[str, Union[str, int, float]]
+    ) -> ai2thor.server.Event:
+        """Take a step in the ai2thor environment."""
+        action = typing.cast(str, action_dict["action"])
+
+        skip_render = "renderImage" in action_dict and not action_dict["renderImage"]
+        last_frame: Optional[np.ndarray] = None
+        if skip_render:
+            last_frame = self.current_frame
+
+        if self.simplify_physics:
+            action_dict["simplifyOPhysics"] = True
+
+        # if "Move" in action and "Hand" not in action:  # type: ignore
+        #     action_dict = {
+        #         **action_dict,
+        #         "moveMagnitude": self._move_mag,
+        #     }  # type: ignore
+        #
+        #     sr = self.controller.step(action_dict)
+
+        move_ahead_commands = ['MoveA']
+        move_hand_commands = ['MoveHandUX', 'MoveHandUY', 'MoveHandUZ', 'MoveHandDX', 'MoveHandDY', 'MoveHandDZ']
+        rotate_commands = ['RotateR', 'RotateL']
+
+        high_level_hand_commands = move_hand_commands + move_ahead_commands + rotate_commands
+
+        if action in high_level_hand_commands:
+            action_dict['manualInteract'] = True
+
+        if action in move_ahead_commands:
+            action_dict['action'] = 'MoveAhead'
+            pass
+        #TODO this is the worst nightmare
+        elif action in move_hand_commands:
+            action_dict['action'] = 'MoveHandDelta'
+            action_dict['x'] = 0
+            action_dict['y'] = 0
+            action_dict['z'] = 0
+            if 'X' in action:
+                action_dict['x'] = MOVE_HAND_CONSTANT
+                if 'D' in action:
+                    action_dict['x'] *= -1
+            if 'Y' in action:
+                action_dict['y'] = MOVE_HAND_CONSTANT
+                if 'D' in action:
+                    action_dict['y'] *= -1
+            if 'Z' in action:
+                action_dict['z'] = MOVE_HAND_CONSTANT
+                if 'D' in action:
+                    action_dict['z'] *= -1
+        elif action in rotate_commands:
+            action_dict['action'] = 'RotateRight' if action == 'RotateR' else 'RotateLeft'
+            action_dict['degrees'] = 45
+
+        sr = self.controller.step(action_dict)
+
+
+        if self.restrict_to_initially_reachable_points:
+            self._snap_agent_to_initially_reachable()
+
+        if skip_render:
+            assert last_frame is not None
+            self.last_event.frame = last_frame
+
+        return sr

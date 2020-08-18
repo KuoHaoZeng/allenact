@@ -5,7 +5,7 @@ from typing import Dict, Tuple, List, Any, Optional
 import gym
 import numpy as np
 
-from plugins.ithor_plugin.ithor_environment import IThorEnvironment
+from plugins.ithor_plugin.ithor_environment import IThorEnvironment, IThorObjManipEnvironment
 from plugins.ithor_plugin.ithor_util import round_to_factor
 from plugins.ithor_plugin.ithor_constants import (
     MOVE_AHEAD,
@@ -14,6 +14,12 @@ from plugins.ithor_plugin.ithor_constants import (
     LOOK_DOWN,
     LOOK_UP,
     END,
+    HandUX,
+    HandUY,
+    HandUZ,
+    HandDX,
+    HandDY,
+    HandDZ,
 )
 from core.base_abstractions.misc import RLStepResult
 from core.base_abstractions.sensor import Sensor
@@ -243,3 +249,85 @@ class ObjectNavTask(Task[IThorEnvironment]):
                 ),
                 True,
             )
+
+class ObjectManipTask(Task[IThorObjManipEnvironment]):
+    """Define the Object Manipulation task for AI2-THOR.
+    
+    Different from object Navigation, object manipulation task requires the agent to perform certain actions
+    using arm. The agent is randomly initalized into an AI2-THOR scene which is close to the target object. 
+    An object manipulation task is considered to be complete if the agent takes an `End` action and the motion 
+    of the arm trajectroy and holding object match certain criteria. 
+
+    The actions aviable to an agent in this task are:
+
+    # Attributes
+
+    env : The ai2thor environment.
+    sensor_suite: Collection of sensors formed from the `sensors` argument in the initializer.
+    task_info : The task info. Must contain a field "object_type" that specifies, as a string,
+        the goal object type.
+    max_steps : The maximum number of steps an agent can take an in the task before it is considered failed.
+    observation_space: The observation space returned on each step from the sensors.   
+    """
+
+    _actions = (MOVE_AHEAD, ROTATE_LEFT, ROTATE_RIGHT, HandUX, HandUY, HandUZ, HandDX, HandDY, HandDZ, END)
+
+    def __init__(
+        self,
+        env: IThorObjManipEnvironment,
+        sensors: List[Sensor],
+        task_info: Dict[str, Any],
+        max_steps: int,
+        **kwargs
+    ) -> None:
+        """Initializer.
+        """
+        super().__init__(
+            env=env, sensors=sensors, task_info=task_info, max_steps=max_steps, **kwargs
+        )
+        self._took_end_action: bool = False
+        self._success: Optional[bool] = False
+        self._subsampled_locations_from_which_obj_visible: Optional[
+            List[Tuple[float, float, int, int]]
+        ] = None
+
+    @property
+    def action_space(self):
+        return gym.spaces.Discrete(len(self._actions))
+
+    def reached_terminal_state(self) -> bool:
+        return self._took_end_action
+
+    @classmethod
+    def class_action_names(cls, **kwargs) -> Tuple[str, ...]:
+        return cls._actions
+
+    def close(self) -> None:
+        self.env.stop()
+
+    def _step(self, action: int) -> RLStepResult:
+        action_str = self.class_action_names()[action]
+
+        return step_result
+
+    def render(self, mode: str = "rgb", *args, **kwargs) -> np.ndarray:
+        assert mode == "rgb", "only rgb rendering is implemented"
+        return self.env.current_frame
+
+    def judge(self) -> float:
+        """Compute the reward after having taken a step."""
+        reward = -0.01
+
+        if not self.last_action_success:
+            reward += -0.03
+
+        if self._took_end_action:
+            reward += 1.0 if self._success else -1.0
+
+        return float(reward)
+
+    def metrics(self) -> Dict[str, Any]:
+        if not self.is_done():
+            return {}
+        else:
+            return {"success": self._success, **super(ObjectNavTask, self).metrics()}
