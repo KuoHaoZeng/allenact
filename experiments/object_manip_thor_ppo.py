@@ -14,7 +14,7 @@ from core.base_abstractions.experiment_config import ExperimentConfig
 from core.base_abstractions.sensor import SensorSuite
 from core.base_abstractions.task import TaskSampler
 
-from plugins.ithor_plugin.ithor_sensors import (RGBSensorThorObjManip, GoalObjectTypeThorObjManipSensor, 
+from plugins.ithor_plugin.ithor_sensors import (RGBSensorThorArm, GoalObjectTypeThorArmSensor, 
                                                 GoalObjectStateThorSensor, CurrentObjectStateThorSensor)
 from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
 from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
@@ -48,7 +48,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     # TEST_SCENES = ["FloorPlan{}_physics".format(i) for i in range(26, 31)]
 
     SENSORS = [
-        RGBSensorThorObjManip(
+        RGBSensorThorArm(
             **{
                 "height": SCREEN_SIZE,
                 "width": SCREEN_SIZE,

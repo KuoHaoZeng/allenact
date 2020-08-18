@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, List
 import gym
 import numpy as np
 
-from plugins.ithor_plugin.ithor_environment import IThorEnvironment, IThorObjManipEnvironment
+from plugins.ithor_plugin.ithor_environment import IThorEnvironment, IThorArmEnvironment
 from plugins.ithor_plugin.ithor_tasks import ObjectNavTask, ObjectManipTask
 from core.base_abstractions.sensor import Sensor, RGBSensor
 from core.base_abstractions.task import Task
@@ -20,14 +20,14 @@ class RGBSensorThor(RGBSensor[IThorEnvironment, Task[IThorEnvironment]]):
     def frame_from_env(self, env: IThorEnvironment) -> np.ndarray:
         return env.current_frame.copy()
 
-class RGBSensorThorObjManip(RGBSensor[IThorObjManipEnvironment, Task[IThorObjManipEnvironment]]):
+class RGBSensorThorArm(RGBSensor[IThorArmEnvironment, Task[IThorArmEnvironment]]):
     """Sensor for RGB images in AI2-THOR.
 
     Returns from a running IThorEnvironment instance, the current RGB
     frame corresponding to the agent's egocentric view.
     """
 
-    def frame_from_env(self, env: IThorObjManipEnvironment) -> np.ndarray:
+    def frame_from_env(self, env: IThorArmEnvironment) -> np.ndarray:
         return env.current_frame.copy()
 
 class GoalObjectTypeThorSensor(Sensor):
@@ -77,7 +77,7 @@ class GoalObjectTypeThorSensor(Sensor):
         return self.object_type_to_ind[task.task_info["object_type"]]
 
 
-class GoalObjectTypeThorObjManipSensor(Sensor):
+class GoalObjectTypeThorArmSensor(Sensor):
     def __init__(
         self,
         object_types: List[str],
@@ -116,7 +116,7 @@ class GoalObjectTypeThorObjManipSensor(Sensor):
 
     def get_observation(
         self,
-        env: IThorObjManipEnvironment,
+        env: IThorArmEnvironment,
         task: Optional[ObjectManipTask],
         *args: Any,
         **kwargs: Any
@@ -137,7 +137,7 @@ class CurrentObjectStateThorSensor(Sensor):
     #TODO make sure the current position of the object is updated after arm is moving
     def get_observation(
             self,
-            env: IThorObjManipEnvironment,
+            env: IThorArmEnvironment,
             task: ObjectManipTask,
             *args: Any,
             **kwargs: Any
@@ -163,7 +163,7 @@ class GoalObjectStateThorSensor(Sensor):
 
     def get_observation(
             self,
-            env: IThorObjManipEnvironment,
+            env: IThorArmEnvironment,
             task: ObjectManipTask,
             *args: Any,
             **kwargs: Any

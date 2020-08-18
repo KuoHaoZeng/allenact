@@ -1088,7 +1088,7 @@ class IThorEnvironment(object):
 
 MOVE_HAND_CONSTANT = 0.1
 
-class IThorObjManipEnvironment(IThorEnvironment):
+class IThorArmEnvironment(IThorEnvironment):
     """Wrapper for the ai2thor controller providing additional functionality
     and bookkeeping.
 
@@ -1114,8 +1114,21 @@ class IThorObjManipEnvironment(IThorEnvironment):
         object_open_speed: float = 1.0,
         simplify_physics: bool = False,
     ) -> None:
-        """
-        """
+        super().__init__(
+                x_display=x_display, 
+                docker_enabled=docker_enabled, 
+                local_thor_build=local_thor_build, 
+                visibility_distance=visibility_distance, 
+                fov=fov, 
+                player_screen_width=player_screen_width, 
+                player_screen_height=player_screen_height, 
+                quality=quality,
+                restrict_to_initially_reachable_points=restrict_to_initially_reachable_points,
+                make_agents_visible=make_agents_visible,
+                object_open_speed=object_open_speed,
+                simplify_physics=simplify_physics,
+                )
+
         self._start_player_screen_width = player_screen_width
         self._start_player_screen_height = player_screen_height
         self._local_thor_build = local_thor_build
@@ -1176,88 +1189,15 @@ class IThorObjManipEnvironment(IThorEnvironment):
                     "y": self._start_player_screen_height,
                 }
             )
-
+            
         self._started = True
         self.reset(scene_name=scene_name, move_mag=move_mag, **kwargs)
 
-    def reset(
-        self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
-    ):
-        self._move_mag = move_mag
-        self._grid_size = self._move_mag
-
-        if scene_name is None:
-            scene_name = self.controller.last_event.metadata["sceneName"]
-        self.controller.reset(scene_name)
-
-        self.controller.step(
-            {
-                "action": "Initialize",
-                "gridSize": self._grid_size,
-                "visibilityDistance": self._visibility_distance,
-                "fov": self._fov,
-                "makeAgentsVisible": self.make_agents_visible,
-                "alwaysReturnVisibleRange": self._always_return_visible_range,
-                'agentControllerType': 'physics',
-                **kwargs,
-            }
-        )
-
-        if self.object_open_speed != 1.0:
-            self.controller.step(
-                {"action": "ChangeOpenSpeed", "x": self.object_open_speed}
-            )
-
-        self._initially_reachable_points = None
-        self._initially_reachable_points_set = None
-        self.controller.step({"action": "GetReachablePositions"})
-        if not self.controller.last_event.metadata["lastActionSuccess"]:
-            warnings.warn(
-                "Error when getting reachable points: {}".format(
-                    self.controller.last_event.metadata["errorMessage"]
-                )
-            )
-        self._initially_reachable_points = self.last_action_return
-
-    def randomize_agent_location(
-        self, seed: int = None, partial_position: Optional[Dict[str, float]] = None
-    ) -> Dict: #TODO for first stage only if object is visible
-        """Teleports the agent to a random reachable location in the scene."""
-        if partial_position is None:
-            partial_position = {}
-        k = 0
-        state: Optional[Dict] = None
-
-        while k == 0 or (not self.last_action_success and k < 10):
-            state = self.random_reachable_state(seed=seed)
-            self.teleport_agent_to(**{**state, **partial_position})
-            k += 1
-
-        if not self.last_action_success:
-            warnings.warn(
-                (
-                    "Randomize agent location in scene {}"
-                    " with seed {} and partial position {} failed in "
-                    "10 attempts. Forcing the action."
-                ).format(self.scene_name, seed, partial_position)
-            )
-            self.teleport_agent_to(**{**state, **partial_position}, force_action=True)  # type: ignore
-            assert self.last_action_success
-
-        assert state is not None
-        return state
-
-    def object_in_hand(self):
-        """Object metadata for the object in the agent's hand."""
-        inv_objs = self.last_event.metadata["inventoryObjects"]
-        if len(inv_objs) == 0:
-            return None
-        elif len(inv_objs) == 1:
-            return self.get_object_by_id(
-                self.last_event.metadata["inventoryObjects"][0]["objectId"]
-            )
-        else:
-            raise AttributeError("Must be <= 1 inventory objects.")
+    def randomize_reachable_agent_location_given_object(
+        self, seed: int = None, partial_position: Optional[Dict[str, float]] = None,
+    ) -> Dict: 
+        """Teleports the agent to a random reachable location in the scene given the object."""
+        pass
 
     def step(
         self, action_dict: Dict[str, Union[str, int, float]]

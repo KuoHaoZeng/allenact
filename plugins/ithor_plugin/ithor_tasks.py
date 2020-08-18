@@ -5,7 +5,7 @@ from typing import Dict, Tuple, List, Any, Optional
 import gym
 import numpy as np
 
-from plugins.ithor_plugin.ithor_environment import IThorEnvironment, IThorObjManipEnvironment
+from plugins.ithor_plugin.ithor_environment import IThorEnvironment, IThorArmEnvironment
 from plugins.ithor_plugin.ithor_util import round_to_factor
 from plugins.ithor_plugin.ithor_constants import (
     MOVE_AHEAD,
@@ -14,12 +14,14 @@ from plugins.ithor_plugin.ithor_constants import (
     LOOK_DOWN,
     LOOK_UP,
     END,
-    HandUX,
-    HandUY,
-    HandUZ,
-    HandDX,
-    HandDY,
-    HandDZ,
+    MOVE_MID_ARM_UX,
+    MOVE_MID_ARM_DX,
+    MOVE_MID_ARM_UY,
+    MOVE_MID_ARM_DY,
+    MOVE_MID_ARM_UZ,
+    MOVE_MID_ARM_DZ,
+    PICK_UP_MID_HAND,
+    DROP_MID_HAND,
 )
 from core.base_abstractions.misc import RLStepResult
 from core.base_abstractions.sensor import Sensor
@@ -250,7 +252,7 @@ class ObjectNavTask(Task[IThorEnvironment]):
                 True,
             )
 
-class ObjectManipTask(Task[IThorObjManipEnvironment]):
+class ObjectManipTask(Task[IThorArmEnvironment]):
     """Define the Object Manipulation task for AI2-THOR.
     
     Different from object Navigation, object manipulation task requires the agent to perform certain actions
@@ -270,11 +272,13 @@ class ObjectManipTask(Task[IThorObjManipEnvironment]):
     observation_space: The observation space returned on each step from the sensors.   
     """
 
-    _actions = (MOVE_AHEAD, ROTATE_LEFT, ROTATE_RIGHT, HandUX, HandUY, HandUZ, HandDX, HandDY, HandDZ, END)
+    # _actions = (MOVE_AHEAD, ROTATE_LEFT, ROTATE_RIGHT, MOVE_MID_ARM_UX, MOVE_MID_ARM_DX, MOVE_MID_ARM_UY, MOVE_MID_ARM_DY, MOVE_MID_ARM_UZ, MOVE_MID_ARM_DZ, PICK_UP_MID_HAND)
+    # current action only move the arm and pick it up.
+    _actions = (MOVE_MID_ARM_UX, MOVE_MID_ARM_DX, MOVE_MID_ARM_UY, MOVE_MID_ARM_DY, MOVE_MID_ARM_UZ, MOVE_MID_ARM_DZ, PICK_UP_MID_HAND)
 
     def __init__(
         self,
-        env: IThorObjManipEnvironment,
+        env: IThorArmEnvironment,
         sensors: List[Sensor],
         task_info: Dict[str, Any],
         max_steps: int,

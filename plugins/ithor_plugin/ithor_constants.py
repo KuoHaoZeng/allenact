@@ -10,12 +10,14 @@ ROTATE_RIGHT = "RotateRight"
 LOOK_DOWN = "LookDown"
 LOOK_UP = "LookUp"
 END = "End"
-HandUX = "MoveHandUX"
-HandUY = "MoveHandUY"
-HandUZ = "MoveHandUZ"
-HandDX = "MoveHandDX"
-HandDY = "MoveHandDY"
-HandDZ = "MoveHandDZ"
+MOVE_MID_ARM_UX = "MoveArmUX"
+MOVE_MID_ARM_DX = "MoveArmDX"
+MOVE_MID_ARM_UY = "MoveArmUY"
+MOVE_MID_ARM_DY = "MoveArmDY"
+MOVE_MID_ARM_UZ = "MoveArmUX"
+MOVE_MID_ARM_DZ = "MoveArmDX"
+PICK_UP_MID_HAND = 'PickUpMidLevelHand'
+DROP_MID_HAND = 'DropMidLevelHand'
 
 
 VISIBILITY_DISTANCE = 1.25
