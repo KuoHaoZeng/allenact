@@ -21,6 +21,7 @@ from plugins.ithor_plugin.ithor_constants import (
     ARM_2_JNT_OFFSET_Y, 
     ARM_LENGTH,
 )
+from utils.debugger_utils import ForkedPdb
 
 class IThorEnvironment(object):
     """Wrapper for the ai2thor controller providing additional functionality
@@ -1198,6 +1199,28 @@ class IThorArmEnvironment(IThorEnvironment):
         self._started = True
         self.reset(scene_name=scene_name, move_mag=move_mag, **kwargs)
 
+    def randomize_arm_pose(self, seed: int = None) -> Dict:
+        if seed is not None:
+            random.seed(seed)
+
+        # z [0, 1]
+        # x [-1, 1]
+        # y [-1, 1]
+        state = {}
+        state['x'] = random.uniform(-1, 1)
+        state['y'] = random.uniform(-1, 1)
+        state['z'] = random.uniform(0, 1)
+
+        self.controller.step(
+                action='MoveMidLevelArm', 
+                position=state, 
+                speed = 1.0, 
+                returnToStart = False, 
+                handCameraSpace = False
+                )
+
+        return state
+
     def randomize_reachable_agent_location_given_object(
         self, object_types, seed: int = None, partial_position: Optional[Dict[str, float]] = None,
     ) -> Dict: 
@@ -1217,12 +1240,10 @@ class IThorArmEnvironment(IThorEnvironment):
         state: Optional[Dict] = None
 
         while k == 0 or (not self.last_action_success and k < 10):
-            
             state = self.random_reachable_state_given_loc(object_position, seed=seed)
             self.teleport_agent_to(**{**state, **partial_position})
-
             k += 1
-            
+
         if not self.last_action_success:
             warnings.warn(
                 (
@@ -1298,57 +1319,17 @@ class IThorArmEnvironment(IThorEnvironment):
 
         if self.simplify_physics:
             action_dict["simplifyOPhysics"] = True
-
-        # if "Move" in action and "Hand" not in action:  # type: ignore
-        #     action_dict = {
-        #         **action_dict,
-        #         "moveMagnitude": self._move_mag,
-        #     }  # type: ignore
-        #
-        #     sr = self.controller.step(action_dict)
-
-        move_ahead_commands = ['MoveA']
-        move_hand_commands = ['MoveHandUX', 'MoveHandUY', 'MoveHandUZ', 'MoveHandDX', 'MoveHandDY', 'MoveHandDZ']
-        rotate_commands = ['RotateR', 'RotateL']
-
-        high_level_hand_commands = move_hand_commands + move_ahead_commands + rotate_commands
-
-        if action in high_level_hand_commands:
-            action_dict['manualInteract'] = True
-
-        if action in move_ahead_commands:
-            action_dict['action'] = 'MoveAhead'
+        if "MoveArm" in action:
             pass
-        #TODO this is the worst nightmare
-        elif action in move_hand_commands:
-            action_dict['action'] = 'MoveHandDelta'
-            action_dict['x'] = 0
-            action_dict['y'] = 0
-            action_dict['z'] = 0
-            if 'X' in action:
-                action_dict['x'] = MOVE_HAND_CONSTANT
-                if 'D' in action:
-                    action_dict['x'] *= -1
-            if 'Y' in action:
-                action_dict['y'] = MOVE_HAND_CONSTANT
-                if 'D' in action:
-                    action_dict['y'] *= -1
-            if 'Z' in action:
-                action_dict['z'] = MOVE_HAND_CONSTANT
-                if 'D' in action:
-                    action_dict['z'] *= -1
-        elif action in rotate_commands:
-            action_dict['action'] = 'RotateRight' if action == 'RotateR' else 'RotateLeft'
-            action_dict['degrees'] = 45
-
-        sr = self.controller.step(action_dict)
-
-
+        elif "PickUpMidLevelHand" in action:
+            pass
+        else:
+            sr = self.controller.step(action_dict)
+        
         if self.restrict_to_initially_reachable_points:
             self._snap_agent_to_initially_reachable()
 
         if skip_render:
             assert last_frame is not None
             self.last_event.frame = last_frame
-
         return sr

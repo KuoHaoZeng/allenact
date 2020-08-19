@@ -274,7 +274,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
 
     # _actions = (MOVE_AHEAD, ROTATE_LEFT, ROTATE_RIGHT, MOVE_MID_ARM_UX, MOVE_MID_ARM_DX, MOVE_MID_ARM_UY, MOVE_MID_ARM_DY, MOVE_MID_ARM_UZ, MOVE_MID_ARM_DZ, PICK_UP_MID_HAND)
     # current action only move the arm and pick it up.
-    _actions = (MOVE_MID_ARM_UX, MOVE_MID_ARM_DX, MOVE_MID_ARM_UY, MOVE_MID_ARM_DY, MOVE_MID_ARM_UZ, MOVE_MID_ARM_DZ, PICK_UP_MID_HAND)
+    _actions = (MOVE_MID_ARM_UX, MOVE_MID_ARM_DX, MOVE_MID_ARM_UY, MOVE_MID_ARM_DY, MOVE_MID_ARM_UZ, MOVE_MID_ARM_DZ, PICK_UP_MID_HAND, END)
 
     def __init__(
         self,
@@ -311,6 +311,30 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         
     def _step(self, action: int) -> RLStepResult:
         action_str = self.class_action_names()[action]
+
+        if action_str == END:
+            self._took_end_action = True
+            self._success = self._is_goal_object_visible()
+            self.last_action_success = self._success
+        else:
+            self.env.step({"action": action_str})
+            self.last_action_success = self.env.last_action_success
+
+            if (
+                not self.last_action_success
+            ) and self._CACHED_LOCATIONS_FROM_WHICH_OBJECT_IS_VISIBLE is not None:
+                self.env.update_graph_with_failed_action(failed_action=action_str)
+
+        step_result = RLStepResult(
+            observation=self.get_observations(),
+            reward=self.judge(),
+            done=self.is_done(),
+            info={"last_action_success": self.last_action_success},
+        )
+        return step_result
+
+
+
 
         return step_result
 

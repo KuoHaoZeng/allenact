@@ -344,6 +344,8 @@ class ObjectManipTaskSampler(TaskSampler):
 
         pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
 
+        arm_pose = self.env.randomize_arm_pose()
+
         object_types_in_scene = set(
             [o["objectType"] for o in self.env.last_event.metadata["objects"]]
         )
@@ -361,8 +363,9 @@ class ObjectManipTaskSampler(TaskSampler):
             )
 
         task_info["start_pose"] = copy.copy(pose)
+        task_info["start_arm_pose"] = copy.copy(arm_pose)
         
-        self._last_sampled_task = ObjectNavTask(
+        self._last_sampled_task = ObjectManipTask(
             env=self.env,
             sensors=self.sensors,
             task_info=task_info,

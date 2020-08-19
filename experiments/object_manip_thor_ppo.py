@@ -20,8 +20,8 @@ from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeTho
 from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
 from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
 
-from projects.objectmanip_baselines.models.object_manip_models import (
-    ObjectManipBaselineActorCritic,
+from projects.objectnav_baselines.models.object_nav_models import (
+    ObjectNavBaselineActorCritic,
 )
 
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
@@ -57,8 +57,6 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
             }
         ),
         GoalObjectTypeThorSensor(**{"object_types": OBJECT_TYPES}),
-        # GoalObjectStateThorSensor(),
-        # CurrentObjectStateThorSensor(),
     ]
 
     ENV_ARGS = {
@@ -138,7 +136,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return ObjectManipBaselineActorCritic(
+        return ObjectNavBaselineActorCritic(
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=SensorSuite(cls.SENSORS).observation_spaces,
             goal_sensor_uuid="goal_object_type_ind",
