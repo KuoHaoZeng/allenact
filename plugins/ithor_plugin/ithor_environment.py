@@ -19,11 +19,8 @@ from plugins.ithor_plugin.ithor_constants import (
     MID_LEVEL_ARM_HEIGHT,
     ARM_2_JNT_OFFSET_X,
     ARM_2_JNT_OFFSET_Y, 
-    ARM_2_JNT_OFFSET_Z, 
-    ARM_LENGTH, 
+    ARM_LENGTH,
 )
-from utils.debugger_utils import ForkedPdb
-
 
 class IThorEnvironment(object):
     """Wrapper for the ai2thor controller providing additional functionality
@@ -1222,36 +1219,72 @@ class IThorArmEnvironment(IThorEnvironment):
         while k == 0 or (not self.last_action_success and k < 10):
             
             state = self.random_reachable_state_given_loc(object_position, seed=seed)
-            ForkedPdb().set_trace()
             self.teleport_agent_to(**{**state, **partial_position})
+
             k += 1
+            
+        if not self.last_action_success:
+            warnings.warn(
+                (
+                    "Randomize agent location in scene {}"
+                    " with seed {} and partial position {} failed in "
+                    "10 attempts. Forcing the action."
+                ).format(self.scene_name, seed, partial_position)
+            )
+            self.teleport_agent_to(**{**state, **partial_position}, force_action=True)  # type: ignore
+            assert self.last_action_success
+
+        assert state is not None
+        return state
 
     def random_reachable_state_given_loc(self, object_position, seed: int = None) -> Dict:
         """Returns a random reachable location in the scene."""
         if seed is not None:
             random.seed(seed)
         xyz = random.choice(self.currently_reachable_points_given_position(object_position))
-        rotation = random.choice([0, 90, 180, 270])
-        horizon = random.choice([0, 30, 60, 330])
+        horizon = random.choice([30]) # look 30 degree down
         state = copy.copy(xyz)
-        state["rotation"] = rotation
         state["horizon"] = horizon
         return state
 
     def currently_reachable_points_given_position(self, object_position, arm_joint_offset=0.3, arm_length=0.5):
         
+        possible_rotations = np.array([0, 90, 180, 270])
         reachable_points = []
         for point in self.currently_reachable_points:
-            # z can not be negative. the closest distance to the object is when the agent face towards the object.
-            
+            # z can not be negative. the closest distance to the object is when the agent face towards the object.            
+            rotation_obj = math.atan2(object_position['x'] - point['x'],  object_position['z'] - point['z']) * 180 / math.pi
+            if rotation_obj < 0: rotation_obj = 360 + rotation_obj
+
             # usually, the rotation can be 1 of [0, 90, 180, 270], so let's check the closest rotation  
-            rotation = math.atan((point['z'] - object_position['z']) / (point['x'] - object_position['x']))
+            rotation_idx = np.argmin(np.abs(possible_rotations - rotation_obj))
+            rotation_init = possible_rotations[rotation_idx]
 
-            if object_position['z'] <= point['z']:
-                
-            
+            # given the pose information, get the new location of jnt2. 
+            arm_jnt2_position = self.arm_jnt2_position_given_point(rotation_init, point)
 
+            # calculate whether the arm can reach the target object given the arm_jnt2_position.
+            distance = self.position_dist(arm_jnt2_position, object_position)
+            if distance < ARM_LENGTH:
+                point['rotation'] = rotation_init
+                # point['distance'] = distance
+                reachable_points.append(point)
+        
+        return reachable_points
+    
+    def arm_jnt2_position_given_point(self, rotation, position):
+        
+        if rotation == 0:
+            arm_jnt2_position = {'x': position['x'], 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z'] + ARM_2_JNT_OFFSET_X}
+        elif rotation == 90:
+            arm_jnt2_position = {'x': position['x'] + ARM_2_JNT_OFFSET_X, 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z']}            
+        elif rotation == 180:
+            arm_jnt2_position = {'x': position['x'], 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z'] - ARM_2_JNT_OFFSET_X}
+        elif rotation == 270:
+            arm_jnt2_position = {'x': position['x'] - ARM_2_JNT_OFFSET_X, 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z']}
 
+        return arm_jnt2_position
+    
     def step(
         self, action_dict: Dict[str, Union[str, int, float]]
     ) -> ai2thor.server.Event:

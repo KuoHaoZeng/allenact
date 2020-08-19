@@ -10,7 +10,7 @@ from core.base_abstractions.sensor import Sensor
 from core.base_abstractions.task import TaskSampler
 from utils.experiment_utils import set_deterministic_cudnn, set_seed
 from utils.system import get_logger
-
+from utils.debugger_utils import ForkedPdb
 
 class ObjectNavTaskSampler(TaskSampler):
     def __init__(
@@ -343,28 +343,26 @@ class ObjectManipTaskSampler(TaskSampler):
             self.env.reset(scene_name=scene)
 
         pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
-        
-        self.env.controller.step(action='MoveMidLevelArm', position=dict(x=0, y=1.2, z=1), speed = 1.0, returnToStart = False, handCameraSpace = False)
-        #TODO remove this
-        print(task_info['objectId'])
 
-        position = object_info['position']
-        rotation = object_info['rotation']
+        object_types_in_scene = set(
+            [o["objectType"] for o in self.env.last_event.metadata["objects"]]
+        )
 
-        #TODO this should be changed lagter, too simple or maybe not possible at all
-        goal_position = copy.copy(position)
-        goal_rotation = copy.copy(rotation)
-        goal_position['x'] += 0.1
-        goal_position['y'] += 0.1
-        goal_position['z'] += 0.1 #TODO all these might not be feasile at all
+        task_info: Dict[str, Any] = {}
+        for ot in random.sample(self.object_types, len(self.object_types)):
+            if ot in object_types_in_scene:
+                task_info["object_type"] = ot
+                break
+
+        if len(task_info) == 0:
+            get_logger().warning(
+                "Scene {} does not contain any"
+                " objects of any of the types {}.".format(scene, self.object_types)
+            )
 
         task_info["start_pose"] = copy.copy(pose)
-
-        task_info['init_obj_state'] = dict(position=position, rotation=rotation)
-        task_info['goal_obj_state'] = dict(position=goal_position, rotation=goal_rotation)
-
-
-        self._last_sampled_task = ObjectManipTask(
+        
+        self._last_sampled_task = ObjectNavTask(
             env=self.env,
             sensors=self.sensors,
             task_info=task_info,
