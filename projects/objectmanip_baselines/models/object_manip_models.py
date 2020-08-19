@@ -42,6 +42,7 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         self,
         action_space: gym.spaces.Discrete,
         observation_space: SpaceDict,
+        goal_sensor_uuid: str,
         hidden_size=512,
         object_type_embedding_dim=8,
         trainable_masked_hidden_state: bool = False,
@@ -53,8 +54,9 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         See class documentation for parameter definitions.
         """
         super().__init__(action_space=action_space, observation_space=observation_space)
-
-        # self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
+        
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
         self._hidden_size = hidden_size
         self.object_type_embedding_size = object_type_embedding_dim
 

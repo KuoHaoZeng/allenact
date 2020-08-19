@@ -14,8 +14,9 @@ from core.base_abstractions.experiment_config import ExperimentConfig
 from core.base_abstractions.sensor import SensorSuite
 from core.base_abstractions.task import TaskSampler
 
-from plugins.ithor_plugin.ithor_sensors import (RGBSensorThorArm, GoalObjectTypeThorArmSensor, 
+from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor, 
                                                 GoalObjectStateThorSensor, CurrentObjectStateThorSensor)
+
 from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
 from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
 
@@ -48,16 +49,16 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     # TEST_SCENES = ["FloorPlan{}_physics".format(i) for i in range(26, 31)]
 
     SENSORS = [
-        RGBSensorThorArm(
+        RGBSensorThor(
             **{
                 "height": SCREEN_SIZE,
                 "width": SCREEN_SIZE,
                 "use_resnet_normalization": True,
             }
         ),
-        # GoalObjectTypeThorObjManipSensor(**{"object_types": OBJECT_TYPES}),
-        GoalObjectStateThorSensor(),
-        CurrentObjectStateThorSensor(),
+        GoalObjectTypeThorSensor(**{"object_types": OBJECT_TYPES}),
+        # GoalObjectStateThorSensor(),
+        # CurrentObjectStateThorSensor(),
     ]
 
     ENV_ARGS = {
@@ -140,6 +141,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
         return ObjectManipBaselineActorCritic(
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=SensorSuite(cls.SENSORS).observation_spaces,
+            goal_sensor_uuid="goal_object_type_ind",
             hidden_size=512,
             object_type_embedding_dim=8,
         )
@@ -180,6 +182,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
         return {
             "scenes": scenes[inds[process_ind] : inds[process_ind + 1]],
+            "object_types": self.OBJECT_TYPES,
             "env_args": self.ENV_ARGS,
             "max_steps": self.MAX_STEPS,
             "sensors": self.SENSORS,

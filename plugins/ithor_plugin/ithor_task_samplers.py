@@ -196,13 +196,13 @@ class ObjectNavTaskSampler(TaskSampler):
         if seed is not None:
             set_seed(seed)
 
-
 class ObjectManipTaskSampler(TaskSampler):
     """
     """
     def __init__(
             self,
             scenes: List[str],
+            object_types: str,
             sensors: List[Sensor],
             max_steps: int,
             env_args: Dict[str, Any],
@@ -216,6 +216,7 @@ class ObjectManipTaskSampler(TaskSampler):
             **kwargs
     ) -> None:
         self.env_args = env_args
+        self.object_types = object_types
         self.scenes = scenes
         self.grid_size = 0.25
         self.env: Optional[IThorArmEnvironment] = None
@@ -341,31 +342,10 @@ class ObjectManipTaskSampler(TaskSampler):
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
 
-        pose = self.env.randomize_reachable_agent_location_given_object()
-
-        # finallyPickedUp = False
-        # while(True):
-        #     pose = self.env.randomize_agent_location(seed=0) #TODO change this seed
-        #     pickupable_object_in_scene = [o for o in self.env.last_event.metadata["objects"] if o['visible'] and o['pickupable']]
-        #     if len(pickupable_object_in_scene) > 0:
-        #         task_info: Dict[str, Any] = {}
-        #         # random.shuffle(pickupable_object_in_scene) #TODO put this back
-        #         for object_info in pickupable_object_in_scene:
-        #             task_info['objectId'] = object_info['objectId']
-
-        #             #TODO only for now, you can change this as an action later
-        #             event = self.env.controller.step('PickupObject', objectId=object_info['objectId'],manualInteract=True)
-        #             if event.metadata['lastActionSuccess']:
-        #                 finallyPickedUp = True
-        #                 break
-        #             else:
-        #                 print('Failed to pickupable', task_info['objectId'])
-        #             # assert event.metadata['lastActionSuccess'], 'Pick up failed'; ForkedPdb().set_trace()
-        #         if finallyPickedUp:
-        #             break
-
-        # #TODO remove this
-
+        pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
+        
+        self.env.controller.step(action='MoveMidLevelArm', position=dict(x=0, y=1.2, z=1), speed = 1.0, returnToStart = False, handCameraSpace = False)
+        #TODO remove this
         print(task_info['objectId'])
 
         position = object_info['position']

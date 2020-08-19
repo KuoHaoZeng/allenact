@@ -308,7 +308,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
 
     def close(self) -> None:
         self.env.stop()
-
+        
     def _step(self, action: int) -> RLStepResult:
         action_str = self.class_action_names()[action]
 

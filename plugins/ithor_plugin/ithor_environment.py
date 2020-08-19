@@ -15,6 +15,14 @@ from ai2thor.controller import Controller
 
 from plugins.ithor_plugin.ithor_util import round_to_factor
 from plugins.ithor_plugin.ithor_constants import VISIBILITY_DISTANCE, FOV
+from plugins.ithor_plugin.ithor_constants import (
+    MID_LEVEL_ARM_HEIGHT,
+    ARM_2_JNT_OFFSET_X,
+    ARM_2_JNT_OFFSET_Y, 
+    ARM_2_JNT_OFFSET_Z, 
+    ARM_LENGTH, 
+)
+from utils.debugger_utils import ForkedPdb
 
 
 class IThorEnvironment(object):
@@ -1177,7 +1185,7 @@ class IThorArmEnvironment(IThorEnvironment):
             )
 
         self.controller = create_controller()
-
+        
         if (
             self._start_player_screen_height,
             self._start_player_screen_width,
@@ -1194,10 +1202,55 @@ class IThorArmEnvironment(IThorEnvironment):
         self.reset(scene_name=scene_name, move_mag=move_mag, **kwargs)
 
     def randomize_reachable_agent_location_given_object(
-        self, seed: int = None, partial_position: Optional[Dict[str, float]] = None,
+        self, object_types, seed: int = None, partial_position: Optional[Dict[str, float]] = None,
     ) -> Dict: 
         """Teleports the agent to a random reachable location in the scene given the object."""
-        pass
+        
+        object_position = None
+        for obj in self.last_event.metadata['objects']:
+            if object_types[0] in obj['name']:
+                object_position = obj['position']
+
+        assert object_position != None
+        # find the closest set of reachable point that for object location. 
+        
+        if partial_position is None:
+            partial_position = {}
+        k = 0
+        state: Optional[Dict] = None
+
+        while k == 0 or (not self.last_action_success and k < 10):
+            
+            state = self.random_reachable_state_given_loc(object_position, seed=seed)
+            ForkedPdb().set_trace()
+            self.teleport_agent_to(**{**state, **partial_position})
+            k += 1
+
+    def random_reachable_state_given_loc(self, object_position, seed: int = None) -> Dict:
+        """Returns a random reachable location in the scene."""
+        if seed is not None:
+            random.seed(seed)
+        xyz = random.choice(self.currently_reachable_points_given_position(object_position))
+        rotation = random.choice([0, 90, 180, 270])
+        horizon = random.choice([0, 30, 60, 330])
+        state = copy.copy(xyz)
+        state["rotation"] = rotation
+        state["horizon"] = horizon
+        return state
+
+    def currently_reachable_points_given_position(self, object_position, arm_joint_offset=0.3, arm_length=0.5):
+        
+        reachable_points = []
+        for point in self.currently_reachable_points:
+            # z can not be negative. the closest distance to the object is when the agent face towards the object.
+            
+            # usually, the rotation can be 1 of [0, 90, 180, 270], so let's check the closest rotation  
+            rotation = math.atan((point['z'] - object_position['z']) / (point['x'] - object_position['x']))
+
+            if object_position['z'] <= point['z']:
+                
+            
+
 
     def step(
         self, action_dict: Dict[str, Union[str, int, float]]
