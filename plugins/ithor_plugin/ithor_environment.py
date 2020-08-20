@@ -20,6 +20,7 @@ from plugins.ithor_plugin.ithor_constants import (
     ARM_2_JNT_OFFSET_X,
     ARM_2_JNT_OFFSET_Y, 
     ARM_LENGTH,
+    MOVE_HAND_CONSTANT,
 )
 from utils.debugger_utils import ForkedPdb
 
@@ -1091,9 +1092,6 @@ class IThorEnvironment(object):
         except nx.NetworkXNoPath as _:
             return float("inf")
 
-
-MOVE_HAND_CONSTANT = 0.1
-
 class IThorArmEnvironment(IThorEnvironment):
     """Wrapper for the ai2thor controller providing additional functionality
     and bookkeeping.
@@ -1207,9 +1205,9 @@ class IThorArmEnvironment(IThorEnvironment):
         # x [-1, 1]
         # y [-1, 1]
         state = {}
-        state['x'] = random.uniform(-1, 1)
-        state['y'] = random.uniform(-1, 1)
-        state['z'] = random.uniform(0, 1)
+        state['x'] = random.uniform(0.4, 0.5)
+        state['y'] = random.uniform(0.4, 0.5)
+        state['z'] = random.uniform(0.2, 0.3)
 
         self.controller.step(
                 action='MoveMidLevelArm', 
@@ -1306,26 +1304,26 @@ class IThorArmEnvironment(IThorEnvironment):
 
         return arm_jnt2_position
     
-
     def get_current_arm_coordinate(self):
 
+        # TODO: This seems not working state, need double care.
         hand_target =  self.last_event.metadata['arm']['handTarget']
-        rotation_y = event.metadata['agent']['rotation']['y']
-        position = event.metadata['agent']['position']
+        rotation_y = self.last_event.metadata['agent']['rotation']['y']
+        position = self.last_event.metadata['agent']['position']
         state = {}
-        state['y'] = hand_target['y'] -position['y'] - ARM_2_JNT_OFFSET_Y 
+        state['y'] = hand_target['y'] - position['y']# + ARM_2_JNT_OFFSET_Y 
         if rotation_y == 0:
             state['x'] = -(position['x'] - hand_target['x'])
             state['z'] = -(position['z'] - hand_target['z'])
         elif rotation_y == 90:
-            state['x'] = -(position['x'] - hand_target['x'])
-            state['z'] = (position['z'] - hand_target['z'])
+            state['z'] = -(position['x'] - hand_target['x'])
+            state['x'] = (position['z'] - hand_target['z'])
         elif rotation_y == 180:
             state['x'] = (position['x'] - hand_target['x'])
             state['z'] = (position['z'] - hand_target['z'])
         elif rotation_y == 270:
-            state['x'] = position['x'] - hand_target['x']
-            state['z'] = -(position['z'] - hand_target['z'])
+            state['z'] = position['x'] - hand_target['x']
+            state['x'] = -(position['z'] - hand_target['z'])
 
         return state
 
@@ -1343,10 +1341,29 @@ class IThorArmEnvironment(IThorEnvironment):
         if self.simplify_physics:
             action_dict["simplifyOPhysics"] = True
         if "MoveArm" in action:
-            arm_state = self.get_current_arm_coordinate()
-            
+            current_arm_state = self.get_current_arm_coordinate()
+            if action == 'MoveArmUX':
+                current_arm_state['x'] += MOVE_HAND_CONSTANT                
+            elif action == 'MoveArmDX':
+                current_arm_state['x'] -= MOVE_HAND_CONSTANT                
+            elif action == 'MoveArmUY':
+                current_arm_state['y'] += MOVE_HAND_CONSTANT                
+            elif action == 'MoveArmDY':
+                current_arm_state['y'] -= MOVE_HAND_CONSTANT                
+            elif action == 'MoveArmUZ':
+                current_arm_state['z'] += MOVE_HAND_CONSTANT                        
+            elif action == 'MoveArmDZ':
+                current_arm_state['z'] -= MOVE_HAND_CONSTANT                
+
+            sr = self.controller.step(
+                    action='MoveMidLevelArm',
+                    position=current_arm_state,
+                    speed = 1.0,
+                    returnToStart = False, 
+                    handCameraSpace = False)
+
         elif "PickUpMidLevelHand" in action:
-            pass
+            sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)
         
@@ -1356,4 +1373,5 @@ class IThorArmEnvironment(IThorEnvironment):
         if skip_render:
             assert last_frame is not None
             self.last_event.frame = last_frame
+        
         return sr

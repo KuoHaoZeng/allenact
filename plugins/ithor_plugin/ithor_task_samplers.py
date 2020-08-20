@@ -342,9 +342,14 @@ class ObjectManipTaskSampler(TaskSampler):
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
 
-        pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
+        # TODO: seems we need to make the pose first, otherwise, there will be collisions when 
+        # setting the arm.
 
+        # TODO: to determine whether the agent can reach the target arm pose, the self.last_action 
+        # requires the agent to return all feasible points, can we do something similar here?  
         arm_pose = self.env.randomize_arm_pose()
+        pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
+        arm_pose = self.env.get_current_arm_coordinate()
 
         object_types_in_scene = set(
             [o["objectType"] for o in self.env.last_event.metadata["objects"]]

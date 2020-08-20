@@ -26,6 +26,7 @@ from plugins.ithor_plugin.ithor_constants import (
 from core.base_abstractions.misc import RLStepResult
 from core.base_abstractions.sensor import Sensor
 from core.base_abstractions.task import Task
+from utils.debugger_utils import ForkedPdb
 
 
 class ObjectNavTask(Task[IThorEnvironment]):
@@ -320,10 +321,11 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             self.env.step({"action": action_str})
             self.last_action_success = self.env.last_action_success
 
-            if (
-                not self.last_action_success
-            ) and self._CACHED_LOCATIONS_FROM_WHICH_OBJECT_IS_VISIBLE is not None:
-                self.env.update_graph_with_failed_action(failed_action=action_str)
+        # ForkedPdb().set_trace()
+            # if (
+            #     not self.last_action_success
+            # ) and self._CACHED_LOCATIONS_FROM_WHICH_OBJECT_IS_VISIBLE is not None:
+            #     self.env.update_graph_with_failed_action(failed_action=action_str)
 
         step_result = RLStepResult(
             observation=self.get_observations(),
@@ -333,10 +335,6 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         )
         return step_result
 
-
-
-
-        return step_result
 
     def render(self, mode: str = "rgb", *args, **kwargs) -> np.ndarray:
         assert mode == "rgb", "only rgb rendering is implemented"
