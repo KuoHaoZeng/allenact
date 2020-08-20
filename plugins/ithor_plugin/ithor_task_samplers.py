@@ -334,10 +334,10 @@ class ObjectManipTaskSampler(TaskSampler):
         scene = self.sample_scene(force_advance_scene)
 
         if self.env is not None:
-            if scene.replace("_physics", "") != self.env.scene_name.replace(
-                    "_physics", ""
-            ):
-                self.env.reset(scene)
+            # if scene.replace("_physics", "") != self.env.scene_name.replace(
+            #         "_physics", ""
+            # ):
+            self.env.reset(scene)
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)

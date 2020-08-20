@@ -1201,6 +1201,10 @@ class IThorArmEnvironment(IThorEnvironment):
         if seed is not None:
             random.seed(seed)
 
+        # drop current object if holds one.
+        if self.object_in_hand():
+            self.controller.step(action='DropMidLevelHand')
+
         # z [0, 1]
         # x [-1, 1]
         # y [-1, 1]
@@ -1212,7 +1216,7 @@ class IThorArmEnvironment(IThorEnvironment):
         self.controller.step(
                 action='MoveMidLevelArm', 
                 position=state, 
-                speed = 1.0, 
+                speed = 2.0, 
                 returnToStart = False, 
                 handCameraSpace = False
                 )

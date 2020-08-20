@@ -32,12 +32,12 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     Training with PPO.
     """
 
-    SCREEN_SIZE = 224
+    SCREEN_SIZE = 448
 
     # Easy setting
     EASY = False
-    OBJECT_TYPES = sorted(["Knife"])
-    TRAIN_SCENES = ["FloorPlan28_physics"]
+    OBJECT_TYPES = sorted(["Bowl"])
+    TRAIN_SCENES = ["FloorPlan1_physics"]
     VALID_SCENES = ["FloorPlan1_physics"]
     TEST_SCENES = ["FloorPlan1_physics"]
 
@@ -81,7 +81,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     def training_pipeline(cls, **kwargs):
         ppo_steps = int(6e4) if cls.EASY else 15 * int(1e6)
         lr = 2.5e-4
-        num_mini_batch = 1 if not torch.cuda.is_available() else 6
+        num_mini_batch = 1 #if not torch.cuda.is_available() else 6
         update_repeats = 4
         num_steps = 128
         metric_accumulate_interval = cls.MAX_STEPS * 10  # Log every 10 max length tasks
