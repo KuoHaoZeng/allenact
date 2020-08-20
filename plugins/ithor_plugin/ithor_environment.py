@@ -1306,6 +1306,29 @@ class IThorArmEnvironment(IThorEnvironment):
 
         return arm_jnt2_position
     
+
+    def get_current_arm_coordinate(self):
+
+        hand_target =  self.last_event.metadata['arm']['handTarget']
+        rotation_y = event.metadata['agent']['rotation']['y']
+        position = event.metadata['agent']['position']
+        state = {}
+        state['y'] = hand_target['y'] -position['y'] - ARM_2_JNT_OFFSET_Y 
+        if rotation_y == 0:
+            state['x'] = -(position['x'] - hand_target['x'])
+            state['z'] = -(position['z'] - hand_target['z'])
+        elif rotation_y == 90:
+            state['x'] = -(position['x'] - hand_target['x'])
+            state['z'] = (position['z'] - hand_target['z'])
+        elif rotation_y == 180:
+            state['x'] = (position['x'] - hand_target['x'])
+            state['z'] = (position['z'] - hand_target['z'])
+        elif rotation_y == 270:
+            state['x'] = position['x'] - hand_target['x']
+            state['z'] = -(position['z'] - hand_target['z'])
+
+        return state
+
     def step(
         self, action_dict: Dict[str, Union[str, int, float]]
     ) -> ai2thor.server.Event:
@@ -1320,7 +1343,8 @@ class IThorArmEnvironment(IThorEnvironment):
         if self.simplify_physics:
             action_dict["simplifyOPhysics"] = True
         if "MoveArm" in action:
-            pass
+            arm_state = self.get_current_arm_coordinate()
+            
         elif "PickUpMidLevelHand" in action:
             pass
         else:
