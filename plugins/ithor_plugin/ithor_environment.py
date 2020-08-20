@@ -1197,6 +1197,22 @@ class IThorArmEnvironment(IThorEnvironment):
         self._started = True
         self.reset(scene_name=scene_name, move_mag=move_mag, **kwargs)
 
+    def restore_object(self, object_poses) -> None:
+        # teleport the object back to the initial scene environment. 
+        self.controller.step(action='SetObjectPoses', objectPoses=object_poses)
+
+    def get_last_object_poses(self):
+        # get current object pose for all the objects.
+        object_poses = []
+        for o in self.last_event.metadata["objects"]:
+            object_poses.append({
+                "objectName": o["name"],
+                "rotation": o["rotation"],
+                "position": o["position"]
+            })
+
+        return object_poses
+
     def randomize_arm_pose(self, seed: int = None) -> Dict:
         if seed is not None:
             random.seed(seed)

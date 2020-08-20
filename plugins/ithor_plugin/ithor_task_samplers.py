@@ -234,7 +234,7 @@ class ObjectManipTaskSampler(TaskSampler):
         self.reset_tasks = max_tasks
 
         self._last_sampled_task: Optional[ObjectManipTask] = None
-
+        self._init_objects_pose: Optional[List[Dict]] = None
         self.seed: Optional[int] = None
         self.set_seed(seed)
 
@@ -334,13 +334,17 @@ class ObjectManipTaskSampler(TaskSampler):
         scene = self.sample_scene(force_advance_scene)
 
         if self.env is not None:
-            # if scene.replace("_physics", "") != self.env.scene_name.replace(
-            #         "_physics", ""
-            # ):
-            self.env.reset(scene)
+            if scene.replace("_physics", "") != self.env.scene_name.replace(
+                    "_physics", ""
+            ):
+                self.env.reset(scene)
+                self._init_objects_pose = self.env.get_last_object_poses()
+            else:
+                self.env.restore_object(self._init_objects_pose)
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
+            self._init_objects_pose = self.env.get_last_object_poses()
 
         # TODO: seems we need to make the pose first, otherwise, there will be collisions when 
         # setting the arm.

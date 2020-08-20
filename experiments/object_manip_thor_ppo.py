@@ -32,14 +32,14 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     Training with PPO.
     """
 
-    SCREEN_SIZE = 448
+    SCREEN_SIZE = 224
 
     # Easy setting
     EASY = False
-    OBJECT_TYPES = sorted(["Bowl"])
-    TRAIN_SCENES = ["FloorPlan1_physics"]
-    VALID_SCENES = ["FloorPlan1_physics"]
-    TEST_SCENES = ["FloorPlan1_physics"]
+    OBJECT_TYPES = sorted(["Knife"])
+    TRAIN_SCENES = ["FloorPlan28_physics"]
+    VALID_SCENES = ["FloorPlan28_physics"]
+    TEST_SCENES = ["FloorPlan28_physics"]
 
     # Hard setting
     # EASY = False
