@@ -32,7 +32,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     Training with PPO.
     """
 
-    SCREEN_SIZE = 224
+    SCREEN_SIZE = 448
 
     # Easy setting
     EASY = False

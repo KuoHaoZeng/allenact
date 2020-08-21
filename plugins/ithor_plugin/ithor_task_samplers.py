@@ -353,6 +353,7 @@ class ObjectManipTaskSampler(TaskSampler):
         # TODO: seems we need to make the pose first, otherwise, there will be collisions when 
         # setting the arm.
         arm_pose = self.env.randomize_arm_pose()
+        arm_pose = self.env.get_current_arm_coordinate()
         # self.env.controller.step(action='SetMidLevelHandRadius', radius=0.1)
 
         # TODO: the object in hand function is not working, drop current object if holds one.
@@ -363,7 +364,6 @@ class ObjectManipTaskSampler(TaskSampler):
         # TODO: to determine whether the agent can reach the target arm pose, the self.last_action 
         # requires the agent to return all feasible points, can we do something similar here?  
         agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
-        arm_pose = self.env.get_current_arm_coordinate()
 
         object_types_in_scene = set(
             [o["objectType"] for o in self.env.last_event.metadata["objects"]]

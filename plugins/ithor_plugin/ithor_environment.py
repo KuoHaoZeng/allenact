@@ -1155,10 +1155,6 @@ class IThorArmEnvironment(IThorEnvironment):
         self._always_return_visible_range = False
         self.simplify_physics = simplify_physics
 
-
-        # TODO: This is a hack to decided what is in object
-        self._objects_in_hand: Optional[List[str]] = []
-
         self.start(None)
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
@@ -1221,13 +1217,24 @@ class IThorArmEnvironment(IThorEnvironment):
         if seed is not None:
             random.seed(seed)
 
+        # drop current object if holds one.
+        if self.object_in_hand():
+            self.controller.step(action='DropMidLevelHand')
+
         # z [0, 1]
-        # x [-1, 1]
+        # x [-1, 1]z
         # y [-1, 1]
         state = {}
-        state['x'] = random.uniform(0.4, 0.5)
-        state['y'] = random.uniform(0.4, 0.5)
+        state['x'] = random.uniform(0.2, 0.3)
+        state['y'] = random.uniform(-0.1, 0.1)
         state['z'] = random.uniform(0.2, 0.3)
+
+        self.controller.step(
+            action='MoveMidLevelArmHeight',
+            y = MID_LEVEL_ARM_HEIGHT,
+            speed = 2.0,
+            returnToStart = False
+        )
 
         self.controller.step(
                 action='MoveMidLevelArm', 
@@ -1328,23 +1335,28 @@ class IThorArmEnvironment(IThorEnvironment):
 
         # TODO: This seems not working state, need double care.
         hand_target =  self.last_event.metadata['arm']['handTarget']
+        robot_arm_1_jnt = self.last_event.metadata['arm']['joints'][0]['position']
         rotation_y = self.last_event.metadata['agent']['rotation']['y']
-        position = self.last_event.metadata['agent']['position']
         state = {}
-        state['y'] = hand_target['y'] - position['y']# + ARM_2_JNT_OFFSET_Y 
+        # BUG: not sure why y is inverse?
         if rotation_y == 0:
-            state['x'] = -(position['x'] - hand_target['x'])
-            state['z'] = -(position['z'] - hand_target['z'])
+            state['x'] = -(robot_arm_1_jnt['x'] - hand_target['x'])
+            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
+            state['z'] = -(robot_arm_1_jnt['z'] - hand_target['z'])
         elif rotation_y == 90:
-            state['z'] = -(position['x'] - hand_target['x'])
-            state['x'] = (position['z'] - hand_target['z'])
+            state['x'] = (robot_arm_1_jnt['z'] - hand_target['z']) 
+            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
+            state['z'] = -(robot_arm_1_jnt['x'] - hand_target['x'])
         elif rotation_y == 180:
-            state['x'] = (position['x'] - hand_target['x'])
-            state['z'] = (position['z'] - hand_target['z'])
+            state['x'] = (robot_arm_1_jnt['x'] - hand_target['x']) 
+            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
+            state['z'] = (robot_arm_1_jnt['z'] - hand_target['z']) 
         elif rotation_y == 270:
-            state['z'] = position['x'] - hand_target['x']
-            state['x'] = -(position['z'] - hand_target['z'])
-
+            state['x'] = -(robot_arm_1_jnt['z'] - hand_target['z'])
+            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
+            state['z'] = (robot_arm_1_jnt['x'] - hand_target['x'])
+        else:
+            assert False 
         return state
 
     def step(
@@ -1361,7 +1373,7 @@ class IThorArmEnvironment(IThorEnvironment):
         if self.simplify_physics:
             action_dict["simplifyOPhysics"] = True
         if "MoveArm" in action:
-            current_arm_state = self.get_current_arm_coordinate()
+            current_arm_state = copy.copy(self.get_current_arm_coordinate())
             if action == 'MoveArmUX':
                 current_arm_state['x'] += MOVE_HAND_CONSTANT                
             elif action == 'MoveArmDX':
@@ -1383,10 +1395,6 @@ class IThorArmEnvironment(IThorEnvironment):
                     handCameraSpace = False)
 
         elif "PickUpMidLevelHand" in action:
-            
-            # TODO: a hack to decide what is being picked up.
-            event = self.controller.step(action='WhatObjectsCanHandPickUp')
-            self._objects_in_hand = event.metadata['actionReturn']
             sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)
