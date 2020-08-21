@@ -338,10 +338,13 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         """
         # TODO: This is a hack for now.
         # object_in_hand = self.env._objects_in_hand
-        if  self.task_info["object_type"] in self.env._objects_in_hand:
-            return True
-        else:
-            return False
+        
+        object_in_hand = False
+        for o in self.env._objects_in_hand:
+            if self.task_info["object_type"] in o:
+                object_in_hand = True
+
+        return object_in_hand
 
         # if object_in_hand and object_in_hand["objectType"] == self.task_info["object_type"]:
         #     return True
