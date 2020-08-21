@@ -245,9 +245,9 @@ class ObjectManipTaskSampler(TaskSampler):
 
     def _create_environment(self) -> IThorArmEnvironment:
         env = IThorArmEnvironment(
-            make_agents_visible=False,
+            make_agents_visible=True,
             object_open_speed=0.05,
-            # restrict_to_initially_reachable_points=True, #TODO is this really important?
+            restrict_to_initially_reachable_points=True, #TODO is this really important?
             **self.env_args,
         )
 
@@ -334,22 +334,26 @@ class ObjectManipTaskSampler(TaskSampler):
         scene = self.sample_scene(force_advance_scene)
 
         if self.env is not None:
-            # if scene.replace("_physics", "") != self.env.scene_name.replace(
-                    # "_physics", ""
-            # ):
-            self.env.reset(scene)
-                # self._init_objects_pose = self.env.get_last_object_poses()
-            # else:
+            if scene.replace("_physics", "") != self.env.scene_name.replace(
+                    "_physics", ""
+            ):
+                self.env.reset(scene)
+                self._init_objects_pose = self.env.get_last_object_poses()
+            else:
                 # BUG: Seems use restore not works some time. 
-                # self.env.restore_object(self._init_objects_pose)
+                # TODO: the object in hand function is not working, drop current object if holds one.
+                # if self.object_in_hand():
+                self.env.controller.step(action='DropMidLevelHand')
+                self.env.restore_object(self._init_objects_pose)
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
-            # self._init_objects_pose = self.env.get_last_object_poses()
+            self._init_objects_pose = self.env.get_last_object_poses()
 
         # TODO: seems we need to make the pose first, otherwise, there will be collisions when 
         # setting the arm.
         arm_pose = self.env.randomize_arm_pose()
+        # self.env.controller.step(action='SetMidLevelHandRadius', radius=0.1)
 
         # TODO: the object in hand function is not working, drop current object if holds one.
         # if self.object_in_hand():
