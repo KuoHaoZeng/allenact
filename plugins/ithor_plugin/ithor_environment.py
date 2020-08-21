@@ -1387,7 +1387,6 @@ class IThorArmEnvironment(IThorEnvironment):
             # TODO: a hack to decide what is being picked up.
             event = self.controller.step(action='WhatObjectsCanHandPickUp')
             self._objects_in_hand = event.metadata['actionReturn']
-            print(self._objects_in_hand)
             sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)

@@ -6,52 +6,56 @@ import gym
 import numpy as np
 import torch
 
-from projects.objectnav_baselines.experiments.objectnav_base import ObjectNavBaseConfig
+from projects.objectmanip_baselines.experiments.objectmanip_base import ObjectManipBaseConfig
 from core.base_abstractions.preprocessor import ObservationSet
 from core.base_abstractions.task import TaskSampler
-from plugins.robothor_plugin.robothor_task_samplers import ObjectNavDatasetTaskSampler
-from plugins.robothor_plugin.robothor_tasks import ObjectNavTask
+
+from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
+from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
 from utils.experiment_utils import Builder
 
 
-class ObjectNaviThorBaseConfig(ObjectNavBaseConfig):
+class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
     """The base config for all iTHOR ObjectNav experiments."""
 
     def __init__(self):
         super().__init__()
         self.TARGET_TYPES = sorted(
             [
-                "AlarmClock",
-                "Apple",
-                "Book",
-                "Bowl",
-                "Box",
-                "Candle",
-                "GarbageCan",
-                "HousePlant",
-                "Laptop",
-                "SoapBottle",
-                "Television",
-                "Toaster",
+                # "AlarmClock",
+                # "Apple",
+                # "Book",
+                # "Bowl",
+                # "Box",
+                # "Candle",
+                # "GarbageCan",
+                # "HousePlant",
+                # "Laptop",
+                # "SoapBottle",
+                # "Television",
+                # "Toaster",
+                "Bowl"
             ]
         )
         self.ENV_ARGS = dict(
-            width=self.CAMERA_WIDTH,
-            height=self.CAMERA_HEIGHT,
-            continuousMode=True,
-            applyActionNoise=self.STOCHASTIC,
-            agentType="stochastic",
-            rotateStepDegrees=self.ROTATION_DEGREES,
-            visibilityDistance=self.VISIBILITY_DISTANCE,
-            gridSize=self.STEP_SIZE,
-            snapToGrid=False,
-            agentMode="bot",
-            include_private_scenes=False,
+            # width=self.CAMERA_WIDTH,
+            # height=self.CAMERA_HEIGHT,
+            # continuousMode=True,
+            # applyActionNoise=self.STOCHASTIC,
+            # agentType="stochastic",
+            # rotateStepDegrees=self.ROTATION_DEGREES,
+            # visibilityDistance=self.VISIBILITY_DISTANCE,
+            # gridSize=self.STEP_SIZE,
+            # snapToGrid=False,
+            # agentMode="bot",
+            # include_private_scenes=False,
+            player_screen_height=self.CAMERA_HEIGHT,
+            player_screen_width=self.CAMERA_WIDTH,
         )
 
         self.NUM_PROCESSES = 80
-        self.TRAIN_GPU_IDS = []#[0, 1, 2, 3, 4, 5, 6]
-        self.VALID_GPU_IDS = []#[7]
+        self.TRAIN_GPU_IDS = [] #[0, 1, 2, 3, 4, 5, 6]
+        self.VALID_GPU_IDS = [] #[7]
         self.TEST_GPU_IDS = [] #[7]
         self.ADVANCE_SCENE_ROLLOUT_PERIOD = 10 ** 13
 
@@ -125,7 +129,7 @@ class ObjectNaviThorBaseConfig(ObjectNavBaseConfig):
 
     @classmethod
     def make_sampler_fn(cls, **kwargs) -> TaskSampler:
-        return ObjectNavDatasetTaskSampler(**kwargs)
+        return ObjectManipTaskSampler(**kwargs)
 
     @staticmethod
     def _partition_inds(n: int, num_parts: int):
@@ -146,7 +150,9 @@ class ObjectNaviThorBaseConfig(ObjectNavBaseConfig):
             if scenes_dir[-1] == "/"
             else scenes_dir + "/*.json.gz"
         )
-        scenes = [scene.split("/")[-1].split(".")[0] for scene in glob.glob(path)]
+        # scenes = [scene.split("/")[-1].split(".")[0] for scene in glob.glob(path)]
+        scenes = ['FloorPlan1_physics']
+
         if total_processes > len(scenes):  # oversample some scenes -> bias
             if total_processes % len(scenes) != 0:
                 print(
@@ -169,7 +175,7 @@ class ObjectNaviThorBaseConfig(ObjectNavBaseConfig):
             "max_steps": self.MAX_STEPS,
             "sensors": self.SENSORS,
             "action_space": gym.spaces.Discrete(
-                len(ObjectNavTask.class_action_names())
+                len(ObjectManipTask.class_action_names())
             ),
             "seed": seeds[process_ind] if seeds is not None else None,
             "deterministic_cudnn": deterministic_cudnn,
