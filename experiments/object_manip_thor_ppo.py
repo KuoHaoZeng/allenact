@@ -36,10 +36,10 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
     # Easy setting
     EASY = False
-    OBJECT_TYPES = sorted(["Knife"])
-    TRAIN_SCENES = ["FloorPlan28_physics"]
-    VALID_SCENES = ["FloorPlan28_physics"]
-    TEST_SCENES = ["FloorPlan28_physics"]
+    OBJECT_TYPES = sorted(["Bowl"])
+    TRAIN_SCENES = ["FloorPlan1_physics"]
+    VALID_SCENES = ["FloorPlan1_physics"]
+    TEST_SCENES = ["FloorPlan1_physics"]
 
     # Hard setting
     # EASY = False

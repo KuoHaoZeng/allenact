@@ -329,7 +329,6 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         )
         return step_result
 
-
     def render(self, mode: str = "rgb", *args, **kwargs) -> np.ndarray:
         assert mode == "rgb", "only rgb rendering is implemented"
         return self.env.current_frame
@@ -337,11 +336,17 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
     def _is_goal_object_in_hand(self)-> bool:
         """Check if the goal object is in hand.
         """
-        object_in_hand = self.env.object_in_hand()
-        if object_in_hand and object_in_hand["objectType"] == self.task_info["object_type"]:
+        # TODO: This is a hack for now.
+        # object_in_hand = self.env._objects_in_hand
+        if  self.task_info["object_type"] in self.env._objects_in_hand:
             return True
         else:
             return False
+
+        # if object_in_hand and object_in_hand["objectType"] == self.task_info["object_type"]:
+        #     return True
+        # else:
+        #     return False
 
     def judge(self) -> float:
         """Compute the reward after having taken a step."""

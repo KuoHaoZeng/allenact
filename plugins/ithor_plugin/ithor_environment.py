@@ -1155,6 +1155,10 @@ class IThorArmEnvironment(IThorEnvironment):
         self._always_return_visible_range = False
         self.simplify_physics = simplify_physics
 
+
+        # TODO: This is a hack to decided what is in object
+        self._objects_in_hand: Optional[List[str]] = []
+
         self.start(None)
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
@@ -1216,10 +1220,6 @@ class IThorArmEnvironment(IThorEnvironment):
     def randomize_arm_pose(self, seed: int = None) -> Dict:
         if seed is not None:
             random.seed(seed)
-
-        # drop current object if holds one.
-        if self.object_in_hand():
-            self.controller.step(action='DropMidLevelHand')
 
         # z [0, 1]
         # x [-1, 1]
@@ -1383,6 +1383,11 @@ class IThorArmEnvironment(IThorEnvironment):
                     handCameraSpace = False)
 
         elif "PickUpMidLevelHand" in action:
+            
+            # TODO: a hack to decide what is being picked up.
+            event = self.controller.step(action='WhatObjectsCanHandPickUp')
+            self._objects_in_hand = event.metadata['actionReturn']
+            print(self._objects_in_hand)
             sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)
