@@ -1398,7 +1398,7 @@ class IThorArmEnvironment(IThorEnvironment):
 
         elif "PickUpMidLevelHand" in action:
             event = self.controller.step(action='WhatObjectsCanHandPickUp')
-            self._objects_in_hand = event['actionReturn']
+            self._objects_in_hand = event.metadata['actionReturn']
             sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)
