@@ -358,7 +358,7 @@ class ObjectManipTaskSampler(TaskSampler):
 
         # TODO: the object in hand function is not working, drop current object if holds one.
         # if self.object_in_hand():
-        self.env.controller.step(action='DropMidLevelHand')
+        # self.env.controller.step(action='DropMidLevelHand')
         self.env._objects_in_hand = []
 
         # TODO: to determine whether the agent can reach the target arm pose, the self.last_action 

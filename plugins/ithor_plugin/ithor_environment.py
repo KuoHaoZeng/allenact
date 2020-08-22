@@ -1287,7 +1287,9 @@ class IThorArmEnvironment(IThorEnvironment):
         """Returns a random reachable location in the scene."""
         if seed is not None:
             random.seed(seed)
-        xyz = random.choice(self.currently_reachable_points_given_position(object_position))
+        
+        xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
+        # xyz = random.choice(self.currently_reachable_points_given_position(object_position))
         horizon = random.choice([30]) # look 30 degree down
         state = copy.copy(xyz)
         state["horizon"] = horizon
@@ -1395,6 +1397,8 @@ class IThorArmEnvironment(IThorEnvironment):
                     handCameraSpace = False)
 
         elif "PickUpMidLevelHand" in action:
+            event = self.controller.step(action='WhatObjectsCanHandPickUp')
+            self._objects_in_hand = event['actionReturn']
             sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)
