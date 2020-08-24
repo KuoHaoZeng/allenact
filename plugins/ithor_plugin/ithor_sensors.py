@@ -67,49 +67,77 @@ class GoalObjectTypeThorSensor(Sensor):
         return self.object_type_to_ind[task.task_info["object_type"]]
 
 
-class CurrentObjectStateThorSensor(Sensor):
-    def __init__(
-            self,
-            uuid: str = "current_obj_state",
-            **kwargs: Any
-    ):
-        # observation_space = gym.spaces.Discrete(len(self.detector_types))
-        observation_space = gym.spaces.Box(low=-100,high=100, shape=(6,), dtype=np.float32)#(low=-1.0, high=2.0, shape=(3, 4), dtype=np.float32) #TODO not sure about low and high
-        #TODO observation space is total bullshit
-        super().__init__(**prepare_locals_for_super(locals()))
-    #TODO make sure the current position of the object is updated after arm is moving
-    def get_observation(
-            self,
-            env: IThorArmEnvironment,
-            task: ObjectManipTask,
-            *args: Any,
-            **kwargs: Any
-    ) -> Any:
-        #TODO use this instead
-        # get_object_by_id
-        object_id = task.task_info['objectId']
-        current_object_state = [o for o in env.controller.last_event.metadata['objects'] if o['objectId'] == object_id]
-        assert len(current_object_state) == 1
-        current_object_state = current_object_state[0]
-        return convert_state_to_tensor(dict(position=current_object_state['position'], rotation=current_object_state['rotation']))
 
-class GoalObjectStateThorSensor(Sensor):
+class CurrentArmStateThorSensor(Sensor):
     def __init__(
-            self,
-            uuid: str = "goal_obj_state",
-            **kwargs: Any
+        self,
+        **kwargs: Any
     ):
-        # observation_space = gym.spaces.Discrete(len(self.detector_types))
-        observation_space = gym.spaces.Box(low=-100,high=100, shape=(6,), dtype=np.float32)#(low=-1.0, high=2.0, shape=(3, 4), dtype=np.float32) #TODO not sure about low and high
-        #TODO observation space is total bullshit
+        observation_space = gym.spaces.Discrete(len(self.detector_types))
         super().__init__(**prepare_locals_for_super(locals()))
 
     def get_observation(
-            self,
-            env: IThorArmEnvironment,
-            task: ObjectManipTask,
-            *args: Any,
-            **kwargs: Any
-    ) -> Any:
-        goal_object_state = task.task_info['goal_obj_state']
-        return convert_state_to_tensor(dict(position=goal_object_state['position'], rotation=goal_object_state['rotation']))
+        self,
+    ):
+        pass
+
+class HandPickUpThorSensor(Sensor):
+    def __init__(
+        self,
+        **kwargs: Any
+    ):
+        observation_space = gym.spaces.Discrete(2)
+        super().__init__(**prepare_locals_for_super(locals()))
+    def get_observation(
+        self,
+    ):
+        pass
+
+
+
+# class CurrentObjectStateThorSensor(Sensor):
+#     def __init__(
+#             self,
+#             uuid: str = "current_obj_state",
+#             **kwargs: Any
+#     ):
+#         # observation_space = gym.spaces.Discrete(len(self.detector_types))
+#         observation_space = gym.spaces.Box(low=-100,high=100, shape=(6,), dtype=np.float32)#(low=-1.0, high=2.0, shape=(3, 4), dtype=np.float32) #TODO not sure about low and high
+#         #TODO observation space is total bullshit
+#         super().__init__(**prepare_locals_for_super(locals()))
+#     #TODO make sure the current position of the object is updated after arm is moving
+#     def get_observation(
+#             self,
+#             env: IThorArmEnvironment,
+#             task: ObjectManipTask,
+#             *args: Any,
+#             **kwargs: Any
+#     ) -> Any:
+#         #TODO use this instead
+#         # get_object_by_id
+#         object_id = task.task_info['objectId']
+#         current_object_state = [o for o in env.controller.last_event.metadata['objects'] if o['objectId'] == object_id]
+#         assert len(current_object_state) == 1
+#         current_object_state = current_object_state[0]
+#         return convert_state_to_tensor(dict(position=current_object_state['position'], rotation=current_object_state['rotation']))
+
+# class GoalObjectStateThorSensor(Sensor):
+#     def __init__(
+#             self,
+#             uuid: str = "goal_obj_state",
+#             **kwargs: Any
+#     ):
+#         # observation_space = gym.spaces.Discrete(len(self.detector_types))
+#         observation_space = gym.spaces.Box(low=-100,high=100, shape=(6,), dtype=np.float32)#(low=-1.0, high=2.0, shape=(3, 4), dtype=np.float32) #TODO not sure about low and high
+#         #TODO observation space is total bullshit
+#         super().__init__(**prepare_locals_for_super(locals()))
+
+#     def get_observation(
+#             self,
+#             env: IThorArmEnvironment,
+#             task: ObjectManipTask,
+#             *args: Any,
+#             **kwargs: Any
+#     ) -> Any:
+#         goal_object_state = task.task_info['goal_obj_state']
+#         return convert_state_to_tensor(dict(position=goal_object_state['position'], rotation=goal_object_state['rotation']))

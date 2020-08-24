@@ -14,14 +14,14 @@ from core.base_abstractions.experiment_config import ExperimentConfig
 from core.base_abstractions.sensor import SensorSuite
 from core.base_abstractions.task import TaskSampler
 
-from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor, 
-                                                GoalObjectStateThorSensor, CurrentObjectStateThorSensor)
+from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor,
+                                                HandPickUpThorSensor)
 
 from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
 from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
 
-from projects.objectnav_baselines.models.object_nav_models import (
-    ObjectNavBaselineActorCritic,
+from projects.objectmanip_baselines.models.object_manip_models import (
+    ObjectManipBaselineActorCritic,
 )
 
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
@@ -57,6 +57,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
             }
         ),
         GoalObjectTypeThorSensor(**{"object_types": OBJECT_TYPES}),
+        HandPickUpThorSensor(),
     ]
 
     ENV_ARGS = {
@@ -136,7 +137,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return ObjectNavBaselineActorCritic(
+        return ObjectManipBaselineActorCritic(
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=SensorSuite(cls.SENSORS).observation_spaces,
             goal_sensor_uuid="goal_object_type_ind",

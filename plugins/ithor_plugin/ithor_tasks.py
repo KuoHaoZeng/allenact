@@ -347,14 +347,14 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
 
         return object_in_hand
     
-    def _distance_to_target(self)->float:
-        min_distance = np.inf
-        for o in self.env.last_event.metadata['objects']:
-            if self.task_info["object_type"] in o['name']:
-                distance = self.env.position_dist(o['position'], self.env.last_event.metadata['arm']['joints'][-1]['position'])
-                if distance < min_distance: min_distance = distance
+    # def _distance_to_target(self)->float:
+    #     min_distance = np.inf
+    #     for o in self.env.last_event.metadata['objects']:
+    #         if self.task_info["object_type"] in o['name']:
+    #             distance = self.env.position_dist(o['position'], self.env.last_event.metadata['arm']['joints'][-1]['position'])
+    #             if distance < min_distance: min_distance = distance
         
-        return min_distance
+    #     return min_distance
 
 
         # if object_in_hand and object_in_hand["objectType"] == self.task_info["object_type"]:
@@ -370,9 +370,9 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             reward += -0.03
 
         if self._took_end_action:
-            # reward += 1.0 if self._success else -1.0
-            reward += 0.1 / self._distance_to_target()
-
+            reward += 1.0 if self._success else -1.0
+            # reward += 0.1 / self._distance_to_target()
+        
         return float(reward)
 
     def metrics(self) -> Dict[str, Any]:
