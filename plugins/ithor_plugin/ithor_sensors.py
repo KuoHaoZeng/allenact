@@ -69,30 +69,49 @@ class GoalObjectTypeThorSensor(Sensor):
 
 
 class CurrentArmStateThorSensor(Sensor):
+    """
+    Get current hand target and arm locations.
+    """
     def __init__(
         self,
+        uuid: str = "current_arm_state",
         **kwargs: Any
     ):
-        observation_space = gym.spaces.Discrete(len(self.detector_types))
+        observation_space = gym.spaces.Box(low=-1.0, high=2.0, shape=(3,), dtype=np.float32)
         super().__init__(**prepare_locals_for_super(locals()))
 
     def get_observation(
         self,
+        env: IThorArmEnvironment,
+        task: Optional[ObjectManipTask],
+        *args: Any,
+        **kwargs: Any
     ):
-        pass
+        state = env.get_current_arm_coordinate()
+        return [state['x'], state['y'], state['z']]
 
 class HandPickUpThorSensor(Sensor):
     def __init__(
         self,
+        uuid: str = "hand_pick_up_state",
         **kwargs: Any
     ):
         observation_space = gym.spaces.Discrete(2)
         super().__init__(**prepare_locals_for_super(locals()))
+
     def get_observation(
         self,
+        env: IThorArmEnvironment,
+        task: Optional[ObjectManipTask],
+        *args: Any,
+        **kwargs: Any
     ):
-        pass
-
+        event = env.controller.step(action='WhatObjectsCanHandPickUp')
+        pickupable_objects = event.metadata['actionReturn']
+        if len(pickupable_objects) == 0:
+            return 0
+        else:
+            return 1
 
 
 # class CurrentObjectStateThorSensor(Sensor):
