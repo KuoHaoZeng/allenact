@@ -334,21 +334,28 @@ class ObjectManipTaskSampler(TaskSampler):
         scene = self.sample_scene(force_advance_scene)
 
         if self.env is not None:
-            # if scene.replace("_physics", "") != self.env.scene_name.replace(
-                    # "_physics", ""
-            # ):
-            self.env.reset(scene)
-                # self._init_objects_pose = self.env.get_last_object_poses()
-            # else:
+            if scene.replace("_physics", "") != self.env.scene_name.replace(
+                    "_physics", ""
+            ):
+                self.env.reset(scene)
+                self._init_objects_pose = self.env.get_last_object_poses()
+                
+            
+            else:
                 # BUG: Seems use restore not works some time. 
-                # TODO: the object in hand function is not working, drop current object if holds one.
-                # if self.object_in_hand():
-                # self.env.controller.step(action='DropMidLevelHand')
-                # self.env.restore_object(self._init_objects_pose)
+                if len(self.env._objects_in_hand) > 0:
+                    self.env.controller.step(action='DropMidLevelHand')
+                self.env.restore_object(self._init_objects_pose)
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
-            # self._init_objects_pose = self.env.get_last_object_poses()
+            self._init_objects_pose = self.env.get_last_object_poses()
+
+
+
+        # TODO: to determine whether the agent can reach the target arm pose, the self.last_action 
+        # requires the agent to return all feasible points, can we do something similar here?  
+        agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
 
         # TODO: seems we need to make the pose first, otherwise, there will be collisions when 
         # setting the arm.
@@ -356,14 +363,7 @@ class ObjectManipTaskSampler(TaskSampler):
         arm_pose = self.env.get_current_arm_coordinate()
         # self.env.controller.step(action='SetMidLevelHandRadius', radius=0.1)
 
-        # TODO: the object in hand function is not working, drop current object if holds one.
-        # if self.object_in_hand():
-        # self.env.controller.step(action='DropMidLevelHand')
         self.env._objects_in_hand = []
-
-        # TODO: to determine whether the agent can reach the target arm pose, the self.last_action 
-        # requires the agent to return all feasible points, can we do something similar here?  
-        agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
 
         object_types_in_scene = set(
             [o["objectType"] for o in self.env.last_event.metadata["objects"]]

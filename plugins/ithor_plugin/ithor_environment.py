@@ -1158,6 +1158,7 @@ class IThorArmEnvironment(IThorEnvironment):
         self.start(None)
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
+        self._objects_in_hand = []
 
     def start(
         self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
@@ -1212,6 +1213,8 @@ class IThorArmEnvironment(IThorEnvironment):
             })
 
         return object_poses
+
+
 
     def randomize_arm_pose(self, seed: int = None) -> Dict:
         if seed is not None:
@@ -1389,12 +1392,22 @@ class IThorArmEnvironment(IThorEnvironment):
             elif action == 'MoveArmDZ':
                 current_arm_state['z'] -= MOVE_HAND_CONSTANT                
 
-            sr = self.controller.step(
-                    action='MoveMidLevelArm',
-                    position=current_arm_state,
-                    speed = 1.0,
-                    returnToStart = False, 
-                    handCameraSpace = False)
+            if len(self._objects_in_hand) == 0:
+                sr = self.controller.step(
+                        action='MoveMidLevelArm',
+                        position=current_arm_state,
+                        speed = 1.0,
+                        returnToStart = False, 
+                        handCameraSpace = False,
+                        stopArmMovementOnContact = True)
+            else:
+                sr = self.controller.step(
+                        action='MoveMidLevelArm',
+                        position=current_arm_state,
+                        speed = 1.0,
+                        returnToStart = False, 
+                        handCameraSpace = False,
+                        stopArmMovementOnContact = False)
 
         elif "PickUpMidLevelHand" in action:
             event = self.controller.step(action='WhatObjectsCanHandPickUp')
