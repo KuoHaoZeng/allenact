@@ -51,6 +51,7 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
             # include_private_scenes=False,
             player_screen_height=self.CAMERA_HEIGHT,
             player_screen_width=self.CAMERA_WIDTH,
+            local_thor_build='/home/jiasenl/code/builds/thor-arm_thor-Linux64',
         )
 
         self.NUM_PROCESSES = 80
