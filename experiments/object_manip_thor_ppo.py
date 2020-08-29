@@ -65,6 +65,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
         "player_screen_height": SCREEN_SIZE,
         "player_screen_width": SCREEN_SIZE,
         "quality": "Very Low",
+        "local_thor_build": "/home/jiasen/Code/ai2thor/unity/builds/thor-arm_thor-Linux64",
     }
 
     MAX_STEPS = 128
@@ -83,7 +84,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     def training_pipeline(cls, **kwargs):
         ppo_steps = int(6e4) if cls.EASY else 15 * int(1e6)
         lr = 2.5e-4
-        num_mini_batch = 1 #if not torch.cuda.is_available() else 6
+        num_mini_batch = 1 if not torch.cuda.is_available() else 6
         update_repeats = 4
         num_steps = 128
         metric_accumulate_interval = cls.MAX_STEPS * 10  # Log every 10 max length tasks
@@ -123,14 +124,14 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     @classmethod
     def machine_params(cls, mode="train", **kwargs):
         if mode == "train":
-            nprocesses = 1 #if not torch.cuda.is_available() else 20
-            gpu_ids = [] #if not torch.cuda.is_available() else [0]
+            nprocesses = 1 if not torch.cuda.is_available() else 20
+            gpu_ids = [] if not torch.cuda.is_available() else [0]
         elif mode == "valid":
             nprocesses = 1
-            gpu_ids = [] #if not torch.cuda.is_available() else [1]
+            gpu_ids = [] if not torch.cuda.is_available() else [0]
         elif mode == "test":
             nprocesses = 1
-            gpu_ids = [] #if not torch.cuda.is_available() else [0]
+            gpu_ids = [] if not torch.cuda.is_available() else [0]
         else:
             raise NotImplementedError("mode must be 'train', 'valid', or 'test'.")
 

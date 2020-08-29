@@ -344,7 +344,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         for o in self.env._objects_in_hand:
             if self.task_info["object_type"] in o:
                 object_in_hand = True
-
+        
         return object_in_hand
     
     # def _distance_to_target(self)->float:
