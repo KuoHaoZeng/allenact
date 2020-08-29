@@ -106,13 +106,13 @@ class HandPickUpThorSensor(Sensor):
         *args: Any,
         **kwargs: Any
     ):
-        event = env.controller.step(action='WhatObjectsCanHandPickUp')
-        pickupable_objects = event.metadata['actionReturn']
-        if len(pickupable_objects) == 0:
-            return 0
-        else:
-            return 1
-
+        # event = env.controller.step(action='WhatObjectsCanHandPickUp')
+        # pickupable_objects = event.metadata['actionReturn']
+        # if len(pickupable_objects) == 0:
+        #     return 0
+        # else:
+        #     return 1
+        return 0
 
 # class CurrentObjectStateThorSensor(Sensor):
 #     def __init__(
