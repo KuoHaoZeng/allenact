@@ -1159,7 +1159,8 @@ class IThorArmEnvironment(IThorEnvironment):
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
         self._objects_in_hand = []
-
+        # self._arm_move_success = True
+        
     def start(
         self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
     ) -> None:
@@ -1364,6 +1365,20 @@ class IThorArmEnvironment(IThorEnvironment):
             assert False 
         return state
 
+    def check_breaking_objects(self):
+        """check whether there is breaking objects in current env"""
+        for o in self.last_event.metadata["objects"]:
+            if o['isBroken']:
+                return True
+        return False
+
+    def check_arm_move_success(self, current_arm_state):
+        actual_arm_state = self.get_current_arm_coordinate()
+        for i in ['x', 'y', 'z']:
+            if abs(current_arm_state[i] - actual_arm_state[i])> 1e-4:
+                return False
+        return True 
+
     def step(
         self, action_dict: Dict[str, Union[str, int, float]]
     ) -> ai2thor.server.Event:
@@ -1409,6 +1424,11 @@ class IThorArmEnvironment(IThorEnvironment):
                         handCameraSpace = False,
                         stopArmMovementOnContact = False)
 
+            # self._arm_move_success = self.check_arm_move_success(current_arm_state)
+            # if self._arm_move_success == False:
+            self.last_action_success = self.check_arm_move_success(current_arm_state)
+            print("arm_move_success",  self.last_action_success)
+
         elif "PickUpMidLevelHand" in action:
             event = self.controller.step(action='WhatObjectsCanHandPickUp')
             self._objects_in_hand = event.metadata['actionReturn']
@@ -1416,8 +1436,8 @@ class IThorArmEnvironment(IThorEnvironment):
         else:
             sr = self.controller.step(action_dict)
         
-        if self.restrict_to_initially_reachable_points:
-            self._snap_agent_to_initially_reachable()
+        # if self.restrict_to_initially_reachable_points:
+        #     self._snap_agent_to_initially_reachable()
 
         if skip_render:
             assert last_frame is not None

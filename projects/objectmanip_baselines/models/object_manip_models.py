@@ -43,11 +43,11 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         action_space: gym.spaces.Discrete,
         observation_space: SpaceDict,
         goal_sensor_uuid: str,
-        hand_sensor_uuid: str,
+        arm_collision_uuid: str,
         arm_state_uuid: str,
         hidden_size=512,
         object_type_embedding_dim=8,
-        hand_sensor_embedding_dim=8,
+        arm_collision_embedding_dim=8,
         arm_state_embedding_dim=64,
         trainable_masked_hidden_state: bool = False,
         num_rnn_layers=1,
@@ -61,10 +61,10 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
 
         self.arm_state_uuid = arm_state_uuid
         self.goal_sensor_uuid = goal_sensor_uuid
-        self.hand_sensor_uuid = hand_sensor_uuid
+        self.arm_collision_uuid = arm_collision_uuid
 
         self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
-        self._n_object_in_hand = self.observation_space.spaces[self.hand_sensor_uuid].n
+        self._n_collision_state = self.observation_space.spaces[self.arm_collision_uuid].n
         self._n_arm_state = self.observation_space.spaces[self.arm_state_uuid].shape[0]
 
         self._hidden_size = hidden_size
@@ -73,7 +73,7 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         self.visual_encoder = SimpleCNN(self.observation_space, self._hidden_size)
         
         self.state_encoder = RNNStateEncoder(
-            (0 if self.is_blind else self._hidden_size) + object_type_embedding_dim + hand_sensor_embedding_dim + arm_state_embedding_dim,
+            (0 if self.is_blind else self._hidden_size) + object_type_embedding_dim + arm_collision_embedding_dim + arm_state_embedding_dim,
             self._hidden_size,
             trainable_masked_hidden_state=trainable_masked_hidden_state,
             num_layers=num_rnn_layers,
@@ -90,9 +90,9 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
 
         self.arm_state_embedding = nn.Linear(self._n_arm_state, arm_state_embedding_dim)
 
-        self.hand_pickup_embedding = nn.Embedding(
-            num_embeddings=self._n_object_in_hand,
-            embedding_dim=hand_sensor_embedding_dim,  
+        self.arm_collision_embedding = nn.Embedding(
+            num_embeddings=self._n_collision_state,
+            embedding_dim=arm_collision_embedding_dim,  
         )
 
         self.train()
@@ -128,11 +128,11 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
             observations[self.arm_state_uuid].to(torch.float)
         )
 
-    def get_hand_pickup_encoding(
+    def get_arm_collision_encoding(
         self, observations: Dict[str, torch.FloatTensor]
     ) -> torch.FloatTensor:
-        return self.hand_pickup_embedding(
-            observations[self.hand_sensor_uuid].to(torch.int64)
+        return self.arm_collision_embedding(
+            observations[self.arm_collision_uuid].to(torch.int64)
         )
 
     def forward(  # type: ignore
@@ -158,9 +158,9 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         Tuple of the `ActorCriticOutput` and recurrent hidden state.
         """
         target_encoding = self.get_object_type_encoding(observations)
-        hand_pickup_encoding = self.get_hand_pickup_encoding(observations)
+        arm_collision_encoding = self.get_arm_collision_encoding(observations)
         arm_state_encoding = self.get_arm_state_encoding(observations)
-        x = [target_encoding, hand_pickup_encoding, arm_state_encoding]
+        x = [target_encoding, arm_collision_encoding, arm_state_encoding]
 
         if not self.is_blind:
             perception_embed = self.visual_encoder(observations)
@@ -421,18 +421,23 @@ class ObjectNavActorCriticTrainResNet50RNN(ActorCriticModel[CategoricalDistr]):
         )
 
 
-class ResnetTensorObjectNavActorCritic(ActorCriticModel[CategoricalDistr]):
+class ResnetTensorObjectManipActorCritic(ActorCriticModel[CategoricalDistr]):
     def __init__(
         self,
         action_space: gym.spaces.Discrete,
         observation_space: SpaceDict,
         goal_sensor_uuid: str,
         rgb_resnet_preprocessor_uuid: Optional[str],
+        arm_collision_uuid: str,
+        arm_state_uuid: str,
         depth_resnet_preprocessor_uuid: Optional[str] = None,
         hidden_size: int = 512,
         goal_dims: int = 32,
         resnet_compressor_hidden_out_dims: Tuple[int, int] = (128, 32),
         combiner_hidden_out_dims: Tuple[int, int] = (128, 32),
+        object_type_embedding_dim=32,
+        arm_collision_embedding_dim=32,
+        arm_state_embedding_dim=64,
     ):
 
         super().__init__(

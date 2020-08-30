@@ -15,7 +15,7 @@ from core.base_abstractions.sensor import SensorSuite
 from core.base_abstractions.task import TaskSampler
 
 from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor,
-                                                HandPickUpThorSensor, CurrentArmStateThorSensor)
+                                                ArmCollisionSensor, CurrentArmStateThorSensor)
 
 from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
 from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
@@ -31,7 +31,6 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
     Training with PPO.
     """
-
     SCREEN_SIZE = 224
 
     # Easy setting
@@ -57,7 +56,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
             }
         ),
         GoalObjectTypeThorSensor(**{"object_types": OBJECT_TYPES}),
-        HandPickUpThorSensor(),
+        ArmCollisionSensor(),
         CurrentArmStateThorSensor(),
     ]
 
@@ -143,7 +142,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=SensorSuite(cls.SENSORS).observation_spaces,
             goal_sensor_uuid="goal_object_type_ind",
-            hand_sensor_uuid="hand_pick_up_state",
+            arm_collision_uuid="arm_collision_state",
             arm_state_uuid="current_arm_state",
             hidden_size=512,
             object_type_embedding_dim=8,

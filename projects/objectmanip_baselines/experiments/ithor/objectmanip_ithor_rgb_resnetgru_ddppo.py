@@ -9,10 +9,12 @@ from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from projects.objectmanip_baselines.experiments.ithor.objectmanip_ithor_base import (
     ObjectManipThorBaseConfig,
 )
-from projects.objectnav_baselines.models.object_nav_models import (
-    ResnetTensorObjectNavActorCritic,
+from projects.objectmanip_baselines.models.object_manip_models import (
+    ResnetTensorObjectManipActorCritic,
 )
-from plugins.ithor_plugin.ithor_sensors import RGBSensorThor, GoalObjectTypeThorSensor
+from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor,
+                                                ArmCollisionSensor, CurrentArmStateThorSensor)
+
 from plugins.habitat_plugin.habitat_preprocessors import ResnetPreProcessorHabitat
 from plugins.ithor_plugin.ithor_tasks import ObjectManipTask
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
@@ -31,6 +33,8 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
                 uuid="rgb_lowres",
             ),
             GoalObjectTypeThorSensor(object_types=self.TARGET_TYPES,),
+            ArmCollisionSensor(),
+            CurrentArmStateThorSensor(),
         ]
 
         self.PREPROCESSORS = [
@@ -99,6 +103,8 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="goal_object_type_ind",
+            arm_collision_uuid="arm_collision_state",
+            arm_state_uuid="current_arm_state",
             rgb_resnet_preprocessor_uuid="rgb_resnet",
             hidden_size=512,
             goal_dims=32,

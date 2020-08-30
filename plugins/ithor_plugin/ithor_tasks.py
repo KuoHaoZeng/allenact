@@ -321,6 +321,8 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             self.env.step({"action": action_str})
             self.last_action_success = self.env.last_action_success
 
+        print(action_str, self.last_action_success)
+
         step_result = RLStepResult(
             observation=self.get_observations(),
             reward=self.judge(),
@@ -347,21 +349,6 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         
         return object_in_hand
     
-    # def _distance_to_target(self)->float:
-    #     min_distance = np.inf
-    #     for o in self.env.last_event.metadata['objects']:
-    #         if self.task_info["object_type"] in o['name']:
-    #             distance = self.env.position_dist(o['position'], self.env.last_event.metadata['arm']['joints'][-1]['position'])
-    #             if distance < min_distance: min_distance = distance
-        
-    #     return min_distance
-
-
-        # if object_in_hand and object_in_hand["objectType"] == self.task_info["object_type"]:
-        #     return True
-        # else:
-        #     return False
-
     def judge(self) -> float:
         """Compute the reward after having taken a step."""
         reward = -0.01
@@ -373,6 +360,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             reward += 1.0 if self._success else -1.0
             # reward += 0.1 / self._distance_to_target()
         
+        print(reward)
         return float(reward)
 
     def metrics(self) -> Dict[str, Any]:

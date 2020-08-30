@@ -90,13 +90,16 @@ class CurrentArmStateThorSensor(Sensor):
         state = env.get_current_arm_coordinate()
         return [state['x'], state['y'], state['z']]
 
-class HandPickUpThorSensor(Sensor):
+class ArmCollisionSensor(Sensor):
+    """
+    if last action is move arm, check whether the arm is moving succesfully.
+    """
     def __init__(
         self,
-        uuid: str = "hand_pick_up_state",
+        uuid: str = "arm_collision_state",
         **kwargs: Any
     ):
-        observation_space = gym.spaces.Discrete(2)
+        observation_space = gym.spaces.Discrete(3)
         super().__init__(**prepare_locals_for_super(locals()))
 
     def get_observation(
@@ -106,57 +109,13 @@ class HandPickUpThorSensor(Sensor):
         *args: Any,
         **kwargs: Any
     ):
-        # event = env.controller.step(action='WhatObjectsCanHandPickUp')
-        # pickupable_objects = event.metadata['actionReturn']
-        # if len(pickupable_objects) == 0:
-        #     return 0
-        # else:
-        #     return 1
-        return 0
+        if "MoveMidLevelArm" == env.last_action:
+            if env.last_action_success:
+                state = 0
+            else:
+                state = 1
+        else:
+            state = 2
 
-# class CurrentObjectStateThorSensor(Sensor):
-#     def __init__(
-#             self,
-#             uuid: str = "current_obj_state",
-#             **kwargs: Any
-#     ):
-#         # observation_space = gym.spaces.Discrete(len(self.detector_types))
-#         observation_space = gym.spaces.Box(low=-100,high=100, shape=(6,), dtype=np.float32)#(low=-1.0, high=2.0, shape=(3, 4), dtype=np.float32) #TODO not sure about low and high
-#         #TODO observation space is total bullshit
-#         super().__init__(**prepare_locals_for_super(locals()))
-#     #TODO make sure the current position of the object is updated after arm is moving
-#     def get_observation(
-#             self,
-#             env: IThorArmEnvironment,
-#             task: ObjectManipTask,
-#             *args: Any,
-#             **kwargs: Any
-#     ) -> Any:
-#         #TODO use this instead
-#         # get_object_by_id
-#         object_id = task.task_info['objectId']
-#         current_object_state = [o for o in env.controller.last_event.metadata['objects'] if o['objectId'] == object_id]
-#         assert len(current_object_state) == 1
-#         current_object_state = current_object_state[0]
-#         return convert_state_to_tensor(dict(position=current_object_state['position'], rotation=current_object_state['rotation']))
-
-# class GoalObjectStateThorSensor(Sensor):
-#     def __init__(
-#             self,
-#             uuid: str = "goal_obj_state",
-#             **kwargs: Any
-#     ):
-#         # observation_space = gym.spaces.Discrete(len(self.detector_types))
-#         observation_space = gym.spaces.Box(low=-100,high=100, shape=(6,), dtype=np.float32)#(low=-1.0, high=2.0, shape=(3, 4), dtype=np.float32) #TODO not sure about low and high
-#         #TODO observation space is total bullshit
-#         super().__init__(**prepare_locals_for_super(locals()))
-
-#     def get_observation(
-#             self,
-#             env: IThorArmEnvironment,
-#             task: ObjectManipTask,
-#             *args: Any,
-#             **kwargs: Any
-#     ) -> Any:
-#         goal_object_state = task.task_info['goal_obj_state']
-#         return convert_state_to_tensor(dict(position=goal_object_state['position'], rotation=goal_object_state['rotation']))
+        print("arm collision state %d:" %state)
+        return state
