@@ -117,5 +117,5 @@ class ArmCollisionSensor(Sensor):
         else:
             state = 2
 
-        print("arm collision state %d:" %state)
+        # print("arm collision state %d:" %state)
         return state
