@@ -321,7 +321,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             self.env.step({"action": action_str})
             self.last_action_success = self.env.last_action_success
 
-        print(action_str, self.last_action_success)
+        # (action_str, self.last_action_success)
 
         step_result = RLStepResult(
             observation=self.get_observations(),
@@ -360,7 +360,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             reward += 1.0 if self._success else -1.0
             # reward += 0.1 / self._distance_to_target()
         
-        print(reward)
+        # print(reward)
         return float(reward)
 
     def metrics(self) -> Dict[str, Any]:

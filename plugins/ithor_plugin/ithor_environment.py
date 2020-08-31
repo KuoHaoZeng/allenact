@@ -1427,7 +1427,7 @@ class IThorArmEnvironment(IThorEnvironment):
             # self._arm_move_success = self.check_arm_move_success(current_arm_state)
             # if self._arm_move_success == False:
             self.last_action_success = self.check_arm_move_success(current_arm_state)
-            print("arm_move_success",  self.last_action_success)
+            # print("arm_move_success",  self.last_action_success)
 
         elif "PickUpMidLevelHand" in action:
             event = self.controller.step(action='WhatObjectsCanHandPickUp')
