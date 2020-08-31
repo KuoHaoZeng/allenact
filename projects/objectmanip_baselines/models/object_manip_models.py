@@ -11,12 +11,14 @@ import torch
 import torch.nn as nn
 from gym.spaces.dict import Dict as SpaceDict
 
-from core.models.basic_models import SimpleCNN, RNNStateEncoder, Flatten
+from core.models.basic_models import SimpleCNN, RNNStateEncoder
 from core.algorithms.onpolicy_sync.policy import (
     ActorCriticModel,
-    LinearActorCriticHead,
     LinearCriticHead,
     LinearActorHead,
+    DistributionType,
+    Memory,
+    ObservationType,
 )
 from core.base_abstractions.misc import ActorCriticOutput
 from core.base_abstractions.distributions import CategoricalDistr
@@ -112,6 +114,18 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
     def num_recurrent_layers(self) -> int:
         """Number of recurrent hidden layers."""
         return self.state_encoder.num_recurrent_layers
+
+    def _recurrent_memory_specification(self):
+        return dict(
+            rnn=(
+                (
+                    ("layer", self.num_recurrent_layers),
+                    ("sampler", None),
+                    ("hidden", self.recurrent_hidden_state_size),
+                ),
+                torch.float32,
+            )
+        )
 
     def get_object_type_encoding(
         self, observations: Dict[str, torch.FloatTensor]

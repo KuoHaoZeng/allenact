@@ -64,7 +64,7 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
 
     @classmethod
     def tag(cls):
-        return "Objectnav-iTHOR-RGB-ResNetGRU-DDPPO"
+        return "Objectmanip-iTHOR-RGB-ResNetGRU-DDPPO"
 
     def training_pipeline(self, **kwargs):
         ppo_steps = int(300000000)

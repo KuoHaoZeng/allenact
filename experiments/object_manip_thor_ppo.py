@@ -64,7 +64,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
         "player_screen_height": SCREEN_SIZE,
         "player_screen_width": SCREEN_SIZE,
         "quality": "Very Low",
-        "local_thor_build": "/home/jiasen/Code/ai2thor/unity/builds/thor-arm_thor-Linux64",
+        "local_thor_build": "/Users/jiasenl/Code/ai2thor/unity/builds/thor-local-OSXIntel64.app/Contents/MacOS/AI2-Thor",
     }
 
     MAX_STEPS = 128
