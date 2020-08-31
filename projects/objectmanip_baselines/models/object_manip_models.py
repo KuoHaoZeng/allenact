@@ -435,9 +435,8 @@ class ResnetTensorObjectManipActorCritic(ActorCriticModel[CategoricalDistr]):
         goal_dims: int = 32,
         resnet_compressor_hidden_out_dims: Tuple[int, int] = (128, 32),
         combiner_hidden_out_dims: Tuple[int, int] = (128, 32),
-        object_type_embedding_dim=32,
         arm_collision_embedding_dim=32,
-        arm_state_embedding_dim=64,
+        arm_state_embedding_dim=32,
     ):
 
         super().__init__(
@@ -457,10 +456,14 @@ class ResnetTensorObjectManipActorCritic(ActorCriticModel[CategoricalDistr]):
             self.goal_visual_encoder = ResnetTensorGoalEncoder(
                 self.observation_space,
                 goal_sensor_uuid,
-                resnet_preprocessor_uuid,
+                rgb_resnet_preprocessor_uuid,
+                arm_collision_uuid,
+                arm_state_uuid,
                 goal_dims,
                 resnet_compressor_hidden_out_dims,
                 combiner_hidden_out_dims,
+                arm_collision_embedding_dim,
+                arm_state_embedding_dim,
             )
         else:
             self.goal_visual_encoder = ResnetDualTensorGoalEncoder(  # type:ignore
@@ -517,21 +520,39 @@ class ResnetTensorGoalEncoder(nn.Module):
         self,
         observation_spaces: SpaceDict,
         goal_sensor_uuid: str,
-        resnet_preprocessor_uuid: str,
+        rgb_resnet_preprocessor_uuid: str,
+        arm_collision_uuid: str,
+        arm_state_uuid: str,
         class_dims: int = 32,
         resnet_compressor_hidden_out_dims: Tuple[int, int] = (128, 32),
         combiner_hidden_out_dims: Tuple[int, int] = (128, 32),
+        arm_collision_embedding_dim=32,
+        arm_state_embedding_dim=32,
     ) -> None:
         super().__init__()
         self.goal_uuid = goal_sensor_uuid
-        self.resnet_uuid = resnet_preprocessor_uuid
+        self.resnet_uuid = rgb_resnet_preprocessor_uuid
+        self.arm_collision_uuid = arm_collision_uuid
+        self.arm_state_uuid = arm_state_uuid
         self.class_dims = class_dims
+        self.arm_collision_embedding_dim = arm_collision_embedding_dim
+        self.arm_state_embedding_dim = arm_state_embedding_dim
         self.resnet_hid_out_dims = resnet_compressor_hidden_out_dims
         self.combine_hid_out_dims = combiner_hidden_out_dims
+
         self.embed_class = nn.Embedding(
             num_embeddings=observation_spaces.spaces[self.goal_uuid].n,
             embedding_dim=self.class_dims,
         )
+        self.arm_state_embedding = nn.Linear(
+            observation_spaces.spaces[arm_state_uuid].shape[0], 
+            arm_state_embedding_dim)
+
+        self.arm_collision_embedding = nn.Embedding(
+            num_embeddings=observation_spaces.spaces[arm_collision_uuid].n,
+            embedding_dim=arm_collision_embedding_dim,  
+        )
+
         self.blind = self.resnet_uuid not in observation_spaces.spaces
         if not self.blind:
             self.resnet_tensor_shape = observation_spaces.spaces[self.resnet_uuid].shape
@@ -543,7 +564,7 @@ class ResnetTensorGoalEncoder(nn.Module):
             )
             self.target_obs_combiner = nn.Sequential(
                 nn.Conv2d(
-                    self.resnet_hid_out_dims[1] + self.class_dims,
+                    self.resnet_hid_out_dims[1] + self.class_dims + self.arm_collision_embedding_dim + self.arm_state_embedding_dim,
                     self.combine_hid_out_dims[0],
                     1,
                 ),
@@ -584,12 +605,26 @@ class ResnetTensorGoalEncoder(nn.Module):
             -1, -1, self.resnet_tensor_shape[-2], self.resnet_tensor_shape[-1]
         )
 
+    def arm_state_embed(self, observations):
+        state_emb = self.arm_state_embedding(observations[self.arm_state_uuid])
+        return state_emb.view(-1, self.arm_state_embedding_dim, 1, 1).expand(
+            -1, -1, self.resnet_tensor_shape[-2], self.resnet_tensor_shape[-1]
+        )
+
+    def arm_collision_embed(self, observations):
+        collision_emb = self.arm_collision_embedding(observations[self.arm_collision_uuid])
+        return collision_emb.view(-1, self.arm_collision_embedding_dim, 1, 1).expand(
+            -1, -1, self.resnet_tensor_shape[-2], self.resnet_tensor_shape[-1]
+        )
+        
     def forward(self, observations):
         if self.blind:
             return self.embed_class(observations[self.goal_uuid])
         embs = [
             self.compress_resnet(observations),
             self.distribute_target(observations),
+            self.arm_state_embed(observations),
+            self.arm_collision_embed(observations),
         ]
         x = self.target_obs_combiner(torch.cat(embs, dim=1,))
         return x.view(x.size(0), -1)  # flatten

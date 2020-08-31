@@ -58,6 +58,8 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
         self.OBSERVATIONS = [
             "rgb_resnet",
             "goal_object_type_ind",
+            "current_arm_state",
+            "arm_collision_state",
         ]
 
     @classmethod
@@ -99,13 +101,13 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return ResnetTensorObjectNavActorCritic(
+        return ResnetTensorObjectManipActorCritic(
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="goal_object_type_ind",
+            rgb_resnet_preprocessor_uuid="rgb_resnet",
             arm_collision_uuid="arm_collision_state",
             arm_state_uuid="current_arm_state",
-            rgb_resnet_preprocessor_uuid="rgb_resnet",
             hidden_size=512,
             goal_dims=32,
         )
