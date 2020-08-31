@@ -19,7 +19,7 @@ import torch.multiprocessing as mp
 import torch.optim
 from setproctitle import setproctitle as ptitle
 
-from core.algorithms.onpolicy_sync.light_engine import (
+from core.algorithms.onpolicy_sync.engine import (
     OnPolicyTrainer,
     OnPolicyInference,
 )
@@ -225,19 +225,17 @@ class OnPolicyRunner(object):
         self.save_project_state()
 
         devices = self.worker_devices("train")
-        num_trainers = len(devices)
+        num_workers = len(devices)
 
         seed = (
             self.seed
         )  # same for all workers. used during initialization of the model
 
         distributed_port = 0
-        distributed_barrier = None
-        if num_trainers > 1:
+        if num_workers > 1:
             distributed_port = find_free_port()
-            distributed_barrier = self.mp_ctx.Barrier(num_trainers)
 
-        for trainer_it in range(num_trainers):
+        for trainer_it in range(num_workers):
             train: mp.process.BaseProcess = self.mp_ctx.Process(
                 target=self.train_loop,
                 kwargs=dict(
@@ -254,10 +252,9 @@ class OnPolicyRunner(object):
                     seed=seed,
                     deterministic_cudnn=self.deterministic_cudnn,
                     mp_ctx=self.mp_ctx,
-                    num_workers=num_trainers,
+                    num_workers=num_workers,
                     device=devices[trainer_it],
                     distributed_port=distributed_port,
-                    distributed_barrier=distributed_barrier,
                     max_sampler_processes_per_worker=max_sampler_processes_per_worker,
                 ),
             )
@@ -297,14 +294,14 @@ class OnPolicyRunner(object):
                 "No processes allocated to validation, no validation will be run."
             )
 
-        self.log(self.local_start_time_str, num_trainers)
+        self.log(self.local_start_time_str, num_workers)
 
         return self.local_start_time_str
 
     def start_test(
         self,
         experiment_date: str,
-        cp: Optional[str] = None,
+        checkpoint: Optional[str] = None,
         skip_checkpoints: int = 0,
         max_sampler_processes_per_worker: Optional[int] = None,
     ):
@@ -312,9 +309,9 @@ class OnPolicyRunner(object):
         self.get_visualizer("test")
         num_testers = len(devices)
 
-        distributed_barrier = None
+        distributed_port = 0
         if num_testers > 1:
-            distributed_barrier = self.mp_ctx.Barrier(num_testers)
+            distributed_port = find_free_port()
 
         for tester_it in range(num_testers):
             test: mp.process.BaseProcess = self.mp_ctx.Process(
@@ -329,8 +326,8 @@ class OnPolicyRunner(object):
                     mp_ctx=self.mp_ctx,
                     num_workers=num_testers,
                     device=devices[tester_it],
-                    distributed_barrier=distributed_barrier,
                     max_sampler_processes_per_worker=max_sampler_processes_per_worker,
+                    distributed_port=distributed_port,
                 ),
             )
 
@@ -341,15 +338,17 @@ class OnPolicyRunner(object):
             "Started {} test processes".format(len(self.processes["test"]))
         )
 
-        checkpoints = self.get_checkpoint_files(experiment_date, cp, skip_checkpoints)
+        checkpoints = self.get_checkpoint_files(
+            experiment_date, checkpoint, skip_checkpoints
+        )
         steps = [self.step_from_checkpoint(cp) for cp in checkpoints]
 
         get_logger().info("Running test on {} steps {}".format(len(steps), steps))
 
-        for cp in checkpoints:
+        for checkpoint in checkpoints:
             # Make all testers work on each checkpoint
             for tester_it in range(num_testers):
-                self.queues["checkpoints"].put(("eval", cp))
+                self.queues["checkpoints"].put(("eval", checkpoint))
         # Signal all testers to terminate cleanly
         for _ in range(num_testers):
             self.queues["checkpoints"].put(("quit", None))
@@ -674,6 +673,11 @@ class OnPolicyRunner(object):
                     elif package[0] == "train_stopped":
                         if package[1] == 0:
                             finalized = True
+                            if not self.running_validation:
+                                get_logger().info(
+                                    "Terminating runner after trainer done (no validation)"
+                                )
+                                break
                         else:
                             raise Exception(
                                 "Train worker {} abnormally terminated".format(
@@ -779,7 +783,6 @@ class OnPolicyRunner(object):
                         "Exception raised when closing {} {}".format(process_type, it)
                     )
                     logif(e)
-                    pass
 
         self._is_closed = True
 

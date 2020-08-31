@@ -1,13 +1,14 @@
 site_name: AllenAct
-site_description: A framework for Embodied AI research
-site_url: https://github.com/allenai/allenact
+site_description: An open source framework for research in Embodied-AI from AI2
+site_url: https://allenact.org
 
 theme:
   name: material
+  custom_dir: overrides
   palette:
     primary: blue
     accent: grey
-  logo: img/AllenAct_A_Greyscale.svg
+  logo: img/AI2_Avatar_White.png
   favicon: img/AllenAct_A.svg
   highlightjs: true
   hljs_languages:
@@ -15,6 +16,7 @@ theme:
   - typescript
   - json
 
+google_analytics: [UA-120916510-8, allenact.org]
 
 repo_name: allenai/allenact
 repo_url: https://github.com/allenai/allenact
@@ -26,31 +28,32 @@ nav:
 - Installation:
   - Install AllenAct: installation/installation-allenact.md
   - Install environments: installation/installation-framework.md
+  - Download datasets: installation/download-datasets.md
 - Getting started:
   - Run your first experiment: getting_started/running-your-first-experiment.md
-  - Structure of the codebase: getting_started/structure.md
   - Primary abstractions: getting_started/abstractions.md
+  - Structure of the codebase: getting_started/structure.md
 - Tutorials:
   - AllenAct Tutorials: tutorials/index.md
   - Navigation in Minigrid: tutorials/minigrid-tutorial.md
   - PointNav in RoboTHOR: tutorials/training-a-pointnav-model.md
   - Swapping environments: tutorials/transfering-to-a-different-environment-framework.md
   - Using a pre-trained model: tutorials/running_inference_on_a_pretrained_model.md
-  - IL to RL with pipelines: tutorials/training-pipelines.md
+#  - IL to RL with pipelines: tutorials/training-pipelines.md
 - HowTos:
   - Define an experiment: howtos/defining-an-experiment.md
   - Change rewards and losses: howtos/changing-rewards-and-losses.md
   - Define a new model: howtos/defining-a-new-model.md
   - Define a new task: howtos/defining-a-new-task.md
   - Define a new training pipeline: howtos/defining-a-new-training-pipeline.md
-  - Visualize results: howtos/visualizing-results.md
-  - Run a multi-agent experiment: howtos/running-a-multi-agent-experiment.md
+  # - Visualize results: howtos/visualizing-results.md
+  # - Run a multi-agent experiment: howtos/running-a-multi-agent-experiment.md
 - Projects:
   - BabyAI baselines: projects/babyai_baselines/README.md
   - PointNav baselines: projects/pointnav_baselines/README.md
   - ObjectNav baselines: projects/objectnav_baselines/README.md
-  - Advisor code: projects/advisor_2020/README.md
-  - Two Body Problem code: projects/two_body_problem_2019/README.md
+  # - Advisor code: projects/advisor_2020/README.md
+  # - Two Body Problem code: projects/two_body_problem_2019/README.md
 - FAQ: FAQ.md
 - Contributing: CONTRIBUTING.md
 - Licence: LICENSE.md
@@ -73,8 +76,8 @@ nav:
           - kfac: api/core/algorithms/onpolicy_sync/losses/kfac.md
           - a2cacktr: api/core/algorithms/onpolicy_sync/losses/a2cacktr.md
         - runner: api/core/algorithms/onpolicy_sync/runner.md
-        - light_engine: api/core/algorithms/onpolicy_sync/light_engine.md
         - policy: api/core/algorithms/onpolicy_sync/policy.md
+        - engine: api/core/algorithms/onpolicy_sync/engine.md
         - vector_sampled_tasks: api/core/algorithms/onpolicy_sync/vector_sampled_tasks.md
         - storage: api/core/algorithms/onpolicy_sync/storage.md
       - offpolicy_sync:
@@ -85,15 +88,7 @@ nav:
   - plugins:
     - habitat_plugin:
       - habitat_constants: api/plugins/habitat_plugin/habitat_constants.md
-      - habitat_tasks: api/plugins/habitat_plugin/habitat_tasks.md
-      - habitat_sensors: api/plugins/habitat_plugin/habitat_sensors.md
-      - habitat_environment: api/plugins/habitat_plugin/habitat_environment.md
       - habitat_preprocessors: api/plugins/habitat_plugin/habitat_preprocessors.md
-      - habitat_task_samplers: api/plugins/habitat_plugin/habitat_task_samplers.md
-      - scripts:
-        - agent_demo: api/plugins/habitat_plugin/scripts/agent_demo.md
-        - make_map: api/plugins/habitat_plugin/scripts/make_map.md
-      - habitat_utils: api/plugins/habitat_plugin/habitat_utils.md
     - lighthouse_plugin:
       - lighthouse_models: api/plugins/lighthouse_plugin/lighthouse_models.md
       - lighthouse_environment: api/plugins/lighthouse_plugin/lighthouse_environment.md
@@ -122,12 +117,24 @@ nav:
       - robothor_constants: api/plugins/robothor_plugin/robothor_constants.md
       - robothor_models: api/plugins/robothor_plugin/robothor_models.md
       - robothor_tasks: api/plugins/robothor_plugin/robothor_tasks.md
+      - configs:
+        - resnet18_objectnav: api/plugins/robothor_plugin/configs/resnet18_objectnav.md
+        - simple_pointnav: api/plugins/robothor_plugin/configs/simple_pointnav.md
+        - resnet18_pointnav: api/plugins/robothor_plugin/configs/resnet18_pointnav.md
+        - pointnav_base: api/plugins/robothor_plugin/configs/pointnav_base.md
+        - resnet18_nav_base: api/plugins/robothor_plugin/configs/resnet18_nav_base.md
+        - nav_base: api/plugins/robothor_plugin/configs/nav_base.md
+        - simple_objectnav: api/plugins/robothor_plugin/configs/simple_objectnav.md
+        - objectnav_base: api/plugins/robothor_plugin/configs/objectnav_base.md
       - robothor_sensors: api/plugins/robothor_plugin/robothor_sensors.md
       - robothor_viz: api/plugins/robothor_plugin/robothor_viz.md
     - minigrid_plugin:
       - minigrid_tasks: api/plugins/minigrid_plugin/minigrid_tasks.md
       - minigrid_environments: api/plugins/minigrid_plugin/minigrid_environments.md
+      - minigrid_offpolicy: api/plugins/minigrid_plugin/minigrid_offpolicy.md
       - minigrid_sensors: api/plugins/minigrid_plugin/minigrid_sensors.md
+      - configs:
+        - minigrid_nomemory: api/plugins/minigrid_plugin/configs/minigrid_nomemory.md
       - minigrid_models: api/plugins/minigrid_plugin/minigrid_models.md
   - projects:
     - objectnav_baselines:
@@ -149,8 +156,11 @@ nav:
       - experiments:
         - go_to_local:
           - bc: api/projects/babyai_baselines/experiments/go_to_local/bc.md
+          - distributed_bc_offpolicy: api/projects/babyai_baselines/experiments/go_to_local/distributed_bc_offpolicy.md
           - dagger: api/projects/babyai_baselines/experiments/go_to_local/dagger.md
+          - bc_offpolicy: api/projects/babyai_baselines/experiments/go_to_local/bc_offpolicy.md
           - bc_teacher_forcing: api/projects/babyai_baselines/experiments/go_to_local/bc_teacher_forcing.md
+          - distributed_bc_teacher_forcing: api/projects/babyai_baselines/experiments/go_to_local/distributed_bc_teacher_forcing.md
           - ppo: api/projects/babyai_baselines/experiments/go_to_local/ppo.md
           - a2c: api/projects/babyai_baselines/experiments/go_to_local/a2c.md
           - base: api/projects/babyai_baselines/experiments/go_to_local/base.md
@@ -169,11 +179,6 @@ nav:
           - pointnav_robothor_depth_simpleconvgru_ddppo: api/projects/pointnav_baselines/experiments/robothor/pointnav_robothor_depth_simpleconvgru_ddppo.md
           - pointnav_robothor_rgb_simpleconvgru_ddppo: api/projects/pointnav_baselines/experiments/robothor/pointnav_robothor_rgb_simpleconvgru_ddppo.md
           - pointnav_robothor_base: api/projects/pointnav_baselines/experiments/robothor/pointnav_robothor_base.md
-        - habitat:
-          - pointnav_habitat_rgb_simpleconvgru_ddppo: api/projects/pointnav_baselines/experiments/habitat/pointnav_habitat_rgb_simpleconvgru_ddppo.md
-          - pointnav_habitat_rgbd_simpleconvgru_ddppo: api/projects/pointnav_baselines/experiments/habitat/pointnav_habitat_rgbd_simpleconvgru_ddppo.md
-          - pointnav_habitat_base: api/projects/pointnav_baselines/experiments/habitat/pointnav_habitat_base.md
-          - pointnav_habitat_depth_simpleconvgru_ddppo: api/projects/pointnav_baselines/experiments/habitat/pointnav_habitat_depth_simpleconvgru_ddppo.md
         - pointnav_base: api/projects/pointnav_baselines/experiments/pointnav_base.md
         - ithor:
           - pointnav_ithor_rgbd_simpleconvgru_ddppo: api/projects/pointnav_baselines/experiments/ithor/pointnav_ithor_rgbd_simpleconvgru_ddppo.md
@@ -183,9 +188,10 @@ nav:
       - models:
         - point_nav_models: api/projects/pointnav_baselines/models/point_nav_models.md
     - tutorials:
-      - pointnav_habitat_rgb_ddppo: api/projects/tutorials/pointnav_habitat_rgb_ddppo.md
       - pointnav_robothor_rgb_ddppo: api/projects/tutorials/pointnav_robothor_rgb_ddppo.md
+      - object_nav_ithor_dagger_then_ppo_one_object: api/projects/tutorials/object_nav_ithor_dagger_then_ppo_one_object.md
       - pointnav_ithor_rgb_ddppo: api/projects/tutorials/pointnav_ithor_rgb_ddppo.md
+      - object_nav_ithor_ppo_one_object: api/projects/tutorials/object_nav_ithor_ppo_one_object.md
       - minigrid_tutorial: api/projects/tutorials/minigrid_tutorial.md
   - tests:
     - multiprocessing:
@@ -206,6 +212,7 @@ markdown_extensions:
     permalink: '#'
 - markdown.extensions.codehilite:
     guess_lang: true
+- meta
 - admonition
 - codehilite
 - extra

@@ -1,12 +1,13 @@
 # Tutorial: Navigation in MiniGrid
  
-In this tutorial, we will train an agent to complete the `MiniGrid-Empty-Random-5x5-v0` task within the [MiniGrid](https://github.com/maximecb/gym-minigrid) environment. We will demonstrate how to:
+In this tutorial, we will train an agent to complete the `MiniGrid-Empty-Random-5x5-v0` task within the
+[MiniGrid](https://github.com/maximecb/gym-minigrid) environment. We will demonstrate how to:
 
 * Write an experiment configuration file with a simple training pipeline from scratch.
 * Use one of the supported environments with minimal user effort.
 * Train, validate and test your experiment from the command line.
 
-This tutorial assumes the [installation instructions](../getting_started/installation.md) have already been followed and, to some
+This tutorial assumes the [installation instructions](../installation/installation-allenact.md) have already been followed and, to some
 extent, this framework's [abstractions](../getting_started/abstractions.md) are known.
 
 ## The task
@@ -34,9 +35,9 @@ class implementing the `ExperimentConfig` abstraction. For this tutorial, we wil
 `projects/tutorials/minigrid_tutorial.py`. 
 
 The `ExperimentConfig` abstraction is used by the
-[OnPolicyTrainer](../api/core/algorithms/onpolicy_sync/light_engine.md#onpolicytrainer) class (for training) and the
-[OnPolicyInference](../api/core/algorithms/onpolicy_sync/light_engine.md#onpolicyinference) class (for validation and testing)
-invoked through the entry script `ddmain.py` that calls an orchestrating
+[OnPolicyTrainer](../api/core/algorithms/onpolicy_sync/engine.md#onpolicytrainer) class (for training) and the
+[OnPolicyInference](../api/core/algorithms/onpolicy_sync/engine.md#onpolicyinference) class (for validation and testing)
+invoked through the entry script `main.py` that calls an orchestrating
 [OnPolicyRunner](../api/core/algorithms/onpolicy_sync/runner.md#onpolicyrunner) class. It includes:
 
 * A `tag` method to identify the experiment.
@@ -72,7 +73,8 @@ allows us to extract observations in a format consumable by an `ActorCriticModel
 ```
 
 The three `view_channels` include objects, colors and states corresponding to a partial observation of the environment
-as an image tensor, equivalent to that from `ImgObsWrapper` in https://github.com/maximecb/gym-minigrid#wrappers. The
+as an image tensor, equivalent to that from `ImgObsWrapper` in
+[MiniGrid](https://github.com/maximecb/gym-minigrid#wrappers). The
 relatively large `agent_view_size` means the view will only be clipped by the environment walls in the forward and
 lateral directions with respect to the agent's orientation.
 
@@ -248,14 +250,15 @@ We have a complete implementation of this experiment's configuration class in `p
 To start training from scratch, we just need to invoke
 
 ```bash
-python ddmain.py minigrid_tutorial -b projects/tutorials -m 8 -o /PATH/TO/minigrid_output -s 12345
+python main.py minigrid_tutorial -b projects/tutorials -m 8 -o /PATH/TO/minigrid_output -s 12345
 ```
 
-from the project root folder.
+from the `allenact` root directory.
 
-* With `-b projects/tutorials` we set the base folder to search for the `minigrid_tutorial` experiment configuration.
+* With `-b projects/tutorials` we tell `allenact` that `minigrid_tutorial` experiment config file 
+will be found in the `projects/tutorials` directory.
 * With `-m 8` we limit the number of subprocesses to 8 (each subprocess will run 16 of the 128 training task samplers).
-* With `-o /PATH/TO/minigrid_output` we set the output folder.
+* With `-o minigrid_output` we set the output folder into which results and logs will be saved.
 * With `-s 12345` we set the random seed.
 
 If we have Tensorboard installed, we can track progress with
@@ -284,7 +287,7 @@ In order to test for a specific experiment, we need to pass its training start d
 `-t EXPERIMENT_DATE`:
 
 ```bash
-python ddmain.py minigrid_tutorial -b projects/tutorials -m 1 -o /PATH/TO/minigrid_output -s 12345 -t EXPERIMENT_DATE
+python main.py minigrid_tutorial -b projects/tutorials -m 1 -o /PATH/TO/minigrid_output -s 12345 -t EXPERIMENT_DATE
 ```
 
 Again, if everything went well, the `test` success rate should converge to 1 and the mean episode length to a value

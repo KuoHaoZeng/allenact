@@ -30,7 +30,7 @@ class MiniGridTutorialExperimentConfig(ExperimentConfig):
     def training_pipeline(cls, **kwargs) -> TrainingPipeline:
         ppo_steps = int(150000)
         return TrainingPipeline(
-            named_losses=dict(ppo_loss=Builder(PPO, kwargs={}, default=PPOConfig,)),
+            named_losses=dict(ppo_loss=PPO(**PPOConfig)),  # type:ignore
             pipeline_stages=[
                 PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
             ],
@@ -46,7 +46,7 @@ class MiniGridTutorialExperimentConfig(ExperimentConfig):
             save_interval=10000,
             metric_accumulate_interval=1,
             lr_scheduler_builder=Builder(
-                LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
+                LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}  # type:ignore
             ),
         )
 
@@ -72,8 +72,8 @@ class MiniGridTutorialExperimentConfig(ExperimentConfig):
         return EmptyRandomEnv5x5()
 
     def _get_sampler_args(self, process_ind: int, mode: str) -> Dict[str, Any]:
-        """
-        Generate initialization arguments for train, valid, and test TaskSamplers.
+        """Generate initialization arguments for train, valid, and test
+        TaskSamplers.
 
         # Parameters
         process_ind : index of the current task sampler

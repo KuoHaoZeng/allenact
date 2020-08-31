@@ -288,7 +288,7 @@ class IThorEnvironment(object):
         """Helper function teleporting the agent to a given location."""
         if standing is None:
             standing = self.last_event.metadata.get(
-                "isStanding", self.last_event.metadata["agent"]["isStanding"]
+                "isStanding", self.last_event.metadata["agent"].get("isStanding")
             )
         original_location = self.get_agent_location()
         target = {"x": x, "y": y, "z": z}
@@ -541,7 +541,7 @@ class IThorEnvironment(object):
             "z": metadata["agent"]["position"]["z"],
             "rotation": metadata["agent"]["rotation"]["y"],
             "horizon": metadata["agent"]["cameraHorizon"],
-            "standing": metadata.get("isStanding", metadata["agent"]["isStanding"]),
+            "standing": metadata.get("isStanding", metadata["agent"].get("isStanding")),
         }
         return location
 

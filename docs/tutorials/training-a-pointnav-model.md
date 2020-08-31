@@ -7,12 +7,12 @@ way to formulate "moving around" into a task is by making your agent find a beac
 This beacon transmits its location, such that at any time, the agent can get the direction and euclidian distance
 to the beacon. This particular task is often called Point Navigation, or **PointNav** for short.
 
-#### Pointnav
+#### PointNav
 At first glance, this task seems trivial. If the agent is given the direction and distance of the target at
 all times, can it not simply follow this signal directly? The answer is no, because agents are often trained
 on this task in environments that emulate real-world buildings which are not wide-open spaces, but rather
 contain many smaller rooms. Because of this, the agent has to learn to navigate human spaces and use doors
-and hallways to efficiently navigate from one side of the house to the other. This task becomes particularly
+and hallways to efficiently navigate from one side of the building to the other. This task becomes particularly
 difficult when the agent is tested in an environment that it is not trained in. If the agent does not know
 how the floor plan of an environment looks, it has to learn to predict the design of man-made structures,
 to efficiently navigate across them, much like how people instinctively know how to move around a building
@@ -42,42 +42,72 @@ but rather a shallow wrapper that provides a uniform interface to the actual env
 
 #### Learning algorithm
 Finally, let us briefly touch on the algorithm that we will use to train our embodied agent to navigate. While
-*allenact* offers us great flexibility to train models using complex pipelines, we will be using a simple
+*AllenAct* offers us great flexibility to train models using complex pipelines, we will be using a simple
 pure reinforcement learning approach for this tutorial. More specifically, we will be using DD-PPO,
 a decentralized and distributed variant of the ubiquitous PPO algorithm. For those unfamiliar with Reinforcement
-Learning we highly recommend this tutorial by Andrej Karpathy (http://karpathy.github.io/2016/05/31/rl/), and this book by Sutton and Barto (http://www.incompleteideas.net/book/the-book-2nd.html). Essentially what we are doing
+Learning we highly recommend [this tutorial](http://karpathy.github.io/2016/05/31/rl/) by Andrej Karpathy, and [this
+book](http://www.incompleteideas.net/book/the-book-2nd.html) by Sutton and Barto. Essentially what we are doing
 is letting our agent explore the environment on its own, rewarding it for taking actions that bring it closer
 to its goal and penalizing it for actions that take it away from its goal. We then optimize the agent's model
 to maximize this reward.
 
+## Requirements
+To train the model on the PointNav task, we need to [install the RoboTHOR environment](../installation/installation-framework.md) 
+and [download the RoboTHOR PointNav dataset](../installation/download-datasets.md)
 
-## Dataset Setup
-To train the model on the PointNav task, we need to download the dataset and precomputed cache of distances to the target. The dataset contains a list of episodes with thousands of randomly generated starting positions and target locations for each of the scenes. The precomputed cache of distances is a large dictionary containing
-the shortest path from each point in a scene, to every other point in that scene. This is used to reward the agent
-for moving closer to the target in terms of geodesic distance - the actual path distance (as opposed to a 
+The dataset contains a list of episodes with thousands of randomly generated starting positions and target locations for each of the scenes
+as well as a precomputed cache of distances, containing the shortest path from each point in a scene, to every other point in that scene. 
+This is used to reward the agent for moving closer to the target in terms of geodesic distance - the actual path distance (as opposed to a 
 straight line distance).
 
-We can download and unzip the data with the following commands:
-```bash
-wget <REDACTED>
-unzip <REDACTED>
-```
-
-
 ## Config File Setup
-Now comes the most important part of the tutorial, we are going to write an experiment config file.
+Now comes the most important part of the tutorial, we are going to write an experiment config file. 
+If this is your first experience with experiment config files in AllenAct, we suggest that you
+first see our how-to on [defining an experiment](../howtos/training-a-pointnav-model.md) which will
+walk you through creating a simplified experiment config file.
 
-Unlike a library that can be imported into python, **AllenAct** is structured as a framework with a runner script called `ddmain.py` which will run the experiment specified in a config file. This design forces us to keep meticulous records of exactly which settings were used to produce a particular result,
+Unlike a library that can be imported into python, **AllenAct** is structured as a framework with a runner script called `main.py` which will run the experiment specified in a config file. This design forces us to keep meticulous records of exactly which settings were used to produce a particular result,
 which can be very useful given how expensive RL models are to train.
 
-We will start by creating a new directory inside the `projects` directory. We can name this whatever we want but for now, we will go with `robothor_pointnav_tutuorial`. Then we can create a directory called 
- `experiments` inside the new directory we just created. This hierarchy is not necessary but it helps keep
-our experiments neatly organized. Now we create a file called `pointnav_robothor_rgb_ddppo` inside the
-`experiments` folder (again the name of this file is arbitrary).
+The `projects/` directory is home to different projects using `AllenAct`. Currently it is populated with baselines
+of popular tasks and tutorials.
 
-We start off by importing `ExperimentConfig` from the framework and defining a new subclass:
+We already have all the code for this tutorial stored in `projects/tutorials/pointnav_robothor_rgb_ddppo.py`. We will
+be using this file to run our experiments, but you can create a new directory in `projects/` and start writing your
+experiment there.
+
+We start off by importing everything we will need:
 ```python
+import glob
+from math import ceil
+from typing import Dict, Any, List, Optional
+
+import gym
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim.lr_scheduler import LambdaLR
+from torchvision import models
+
+from core.algorithms.onpolicy_sync.losses import PPO
+from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
+from projects.pointnav_baselines.models.point_nav_models import (
+    ResnetTensorPointNavActorCritic,
+)
+from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from core.base_abstractions.experiment_config import ExperimentConfig
+from core.base_abstractions.preprocessor import ObservationSet
+from core.base_abstractions.task import TaskSampler
+from plugins.habitat_plugin.habitat_preprocessors import ResnetPreProcessorHabitat
+from plugins.robothor_plugin.robothor_sensors import GPSCompassSensorRoboThor
+from plugins.robothor_plugin.robothor_task_samplers import PointNavDatasetTaskSampler
+from plugins.robothor_plugin.robothor_tasks import PointNavTask
+from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
+```
+
+Next we define a new experiment config class:
+```python
 class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
 ```
 We then define the task parameters. For PointNav, these include the maximum number of steps our agent
@@ -134,8 +164,8 @@ Since we are using a dataset to train our model we need to define the path to wh
 download the dataset instructed above we can define the path as follows
 ```python
     # Dataset Parameters
-    TRAIN_DATASET_DIR = "dataset/robothor/objectnav/train"
-    VAL_DATASET_DIR = "dataset/robothor/objectnav/val"
+    TRAIN_DATASET_DIR = "datasets/robothor-pointnav/train"
+    VAL_DATASET_DIR = "datasets/robothor-pointnav/val"
 ```
 
 
@@ -156,7 +186,7 @@ the point our agent needs to move to. It tells us the direction and distance to 
 
 ```
 
-For the sake of this example, we are also going to be using a preprocessor with our model. In *allenact*
+For the sake of this example, we are also going to be using a preprocessor with our model. In *AllenAct*
 the preprocessor abstraction is designed with large models with frozen weights in mind. These models often
 hail from the ResNet family and transform the raw pixels that our agent observes in the environment, into a
 complex embedding, which then gets stored and used as input to our trainable model instead of the original image.
@@ -358,7 +388,7 @@ each process should work with. If we have several GPUS and many scenes this proc
         seeds: Optional[List[int]] = None,
         deterministic_cudnn: bool = False,
     ) -> Dict[str, Any]:
-        path = scenes_dir + "*.json.gz" if scenes_dir[-1] == "/" else scenes_dir + "/*.json.gz"
+        path = os.path.join(scenes_dir, "*.json.gz")
         scenes = [scene.split("/")[-1].split(".")[0] for scene in glob.glob(path)]
         if total_processes > len(scenes):  # oversample some scenes -> bias
             if total_processes % len(scenes) != 0:
@@ -402,7 +432,7 @@ set.
         deterministic_cudnn: bool = False,
     ) -> Dict[str, Any]:
         res = self._get_sampler_args_for_scene_split(
-            self.TRAIN_DATASET_DIR + '/episodes/',
+            os.path.join(self.TRAIN_DATASET_DIR, "episodes"),
             process_ind,
             total_processes,
             seeds=seeds,
@@ -468,44 +498,39 @@ set.
 
 This is it! If we copy all of the code into a file we should be able to run our experiment!
 
+## Training Model On Debug Dataset
+We can test if our installation worked properly by training our model on a small dataset of 4 episodes. This
+should take about 20 minutes on a computer with a NVIDIA GPU.
 
-## Testing Pre-Trained Model
-With the experiment all set up, we can try testing it with pre-trained weights.
+First we need to change the dataset path to point to our small debug dataset. Modify these lines in your file
+```python
+    # Dataset Parameters
+    TRAIN_DATASET_DIR = "datasets/robothor-pointnav/debug"
+    VAL_DATASET_DIR = "datasets/robothor-pointnav/debug"
+```
+Note that we changed both the train and test dataset to debug, so the model will train and validate on the same
+4 episodes.
 
-We can download and unzip these weights with the following commands:
+We can now train a model by running:
 ```bash
-mkdir projects/pointnav_robothor_rgb/weights
-cd projects/pointnav_robothor_rgb/weights
-cd models
-wget <REDACTED>
-unzip <REDACTED>
+python main.py -o <PATH_TO_OUTPUT> -c -b <BASE_DIRECTORY_OF_YOUR_EXPERIMENT> <EXPERIMENT_NAME>
 ```
-We can then test the model by running:
+If using the same configuration as we have set up, the following command should work:
 ```bash
-python ddmain.py -o <PATH_TO_OUTPUT> -c <PATH_TO_CHECKPOINT> -t -b <BASE_DIRECTORY_OF_YOUR_EXPERIMENT> <EXPERIMENT_NAME>
-```
-Where `PATH_TO_OUTPUT` is the location where the results of the test will be dumped, `PATH_TO_CHECKPOINT` is the 
-location of the downloaded model weights, `<BASE_DIRECTORY_OF_YOUR_EXPERIMENT>` is a path to the directory where our
-experiment definition is stored and <EXPERIMENT_NAME> is simply the name of our experiment (without the file extension).
-
-For our current setup the following command would work:
-```bash
-python ddmain.py -o projects/pointnav_robothor_rgb/storage/ -c projects/pointnav_robothor_rgb/weights/NAME -t -b projects/pointnav_robothor_rgb/experiments pointnav_robothor_rgb_ddppo
-```
-The scripts should produce a json output in the specified folder containing the results of our test.
-
-## Training Model From Scratch
-We can also train the model from scratch by running:
-```
-python ddmain.py -o <PATH_TO_OUTPUT> -c -b <BASE_DIRECTORY_OF_YOUR_EXPERIMENT> <EXPERIMENT_NAME>
-```
-But be aware, training this takes nearly 2 days on a machine with 8 GPU. For our current setup the following command would work:
-```
-python ddmain.py -o projects/pointnav_robothor_rgb/storage/ -b projects/pointnav_robothor_rgb/experiments pointnav_robothor_rgb_ddppo
+python main.py -o storage/robothor-pointnav-rgb-resnet-resnet -b projects/tutorials pointnav_robothor_rgb_ddppo
 ```
 If we start up a tensorboard server during training and specify that `output_dir=storage` the output should look
 something like this:
-![tensorboard output](../img/tb.png)
+![tensorboard output](../img/point-nav-baseline-tb.png)
+
+
+## Training Model On Full Dataset
+We can also train the model on the full dataset by changing back our dataset path and running the same command as above.
+But be aware, training this takes nearly 2 days on a machine with 8 GPU.
+
+
+## Testing Model
+To test the performance of a model please refer to [this tutorial](running_inference_on_a_pretrained_model.md).
 
 
 ## Conclusion

@@ -1,4 +1,5 @@
 import glob
+import os
 from math import ceil
 from typing import Dict, Any, List, Optional
 
@@ -10,6 +11,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 from torchvision import models
 
+from constants import ABS_PATH_OF_TOP_LEVEL_DIR
 from core.algorithms.onpolicy_sync.losses import PPO
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from projects.pointnav_baselines.models.point_nav_models import (
@@ -45,14 +47,18 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
 
     # Training Engine Parameters
     ADVANCE_SCENE_ROLLOUT_PERIOD = 10 ** 13
-    NUM_PROCESSES = 60
-    TRAINING_GPUS = [0, 1, 2, 3, 4, 5, 6]
-    VALIDATION_GPUS = [7]
-    TESTING_GPUS = [7]
+    NUM_PROCESSES = 20
+    TRAINING_GPUS = [0]
+    VALIDATION_GPUS = [0]
+    TESTING_GPUS = [0]
 
     # Dataset Parameters
-    TRAIN_DATASET_DIR = "dataset/robothor/objectnav/train"
-    VAL_DATASET_DIR = "dataset/robothor/objectnav/val"
+    TRAIN_DATASET_DIR = os.path.join(
+        ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/robothor-pointnav/debug"
+    )
+    VAL_DATASET_DIR = os.path.join(
+        ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/robothor-pointnav/debug"
+    )
 
     SENSORS = [
         RGBSensorThor(
@@ -77,7 +83,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
                 "torchvision_resnet_model": models.resnet18,
                 "input_uuids": ["rgb_lowres"],
                 "output_uuid": "rgb_resnet",
-                "parallel": False,  # TODO False for debugging
+                "parallel": False,
             },
         ),
     ]
@@ -107,7 +113,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         update_repeats = 3
         num_steps = 30
         save_interval = 5000000
-        log_interval = 10000
+        log_interval = 1000
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95
@@ -134,7 +140,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         )
 
     def split_num_processes(self, ndevices):
-        assert self.NUM_PROCESSES >= ndevices, "NUM_PROCESSES {} < ndevices".format(
+        assert self.NUM_PROCESSES >= ndevices, "NUM_PROCESSES {} < ndevices {}".format(
             self.NUM_PROCESSES, ndevices
         )
         res = [0] * ndevices
@@ -151,7 +157,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
                 else self.TRAINING_GPUS * workers_per_device
             )
             nprocesses = (
-                1
+                8
                 if not torch.cuda.is_available()
                 else self.split_num_processes(len(gpu_ids))
             )
@@ -226,12 +232,17 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         seeds: Optional[List[int]] = None,
         deterministic_cudnn: bool = False,
     ) -> Dict[str, Any]:
-        path = (
-            scenes_dir + "*.json.gz"
-            if scenes_dir[-1] == "/"
-            else scenes_dir + "/*.json.gz"
-        )
+        path = os.path.join(scenes_dir, "*.json.gz")
         scenes = [scene.split("/")[-1].split(".")[0] for scene in glob.glob(path)]
+        if len(scenes) == 0:
+            raise RuntimeError(
+                (
+                    "Could find no scene dataset information in directory {}."
+                    " Are you sure you've downloaded them? "
+                    " If not, see https://allenact.org/installation/download-datasets/ information"
+                    " on how this can be done."
+                ).format(scenes_dir)
+            )
         if total_processes > len(scenes):  # oversample some scenes -> bias
             if total_processes % len(scenes) != 0:
                 print(
@@ -267,7 +278,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         deterministic_cudnn: bool = False,
     ) -> Dict[str, Any]:
         res = self._get_sampler_args_for_scene_split(
-            self.TRAIN_DATASET_DIR + "/episodes/",
+            os.path.join(self.TRAIN_DATASET_DIR, "episodes"),
             process_ind,
             total_processes,
             seeds=seeds,
@@ -294,7 +305,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         deterministic_cudnn: bool = False,
     ) -> Dict[str, Any]:
         res = self._get_sampler_args_for_scene_split(
-            self.VAL_DATASET_DIR + "/episodes/",
+            os.path.join(self.VAL_DATASET_DIR, "episodes"),
             process_ind,
             total_processes,
             seeds=seeds,
@@ -320,7 +331,7 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         deterministic_cudnn: bool = False,
     ) -> Dict[str, Any]:
         res = self._get_sampler_args_for_scene_split(
-            self.VAL_DATASET_DIR + "/episodes/",
+            os.path.join(self.VAL_DATASET_DIR, "episodes"),
             process_ind,
             total_processes,
             seeds=seeds,

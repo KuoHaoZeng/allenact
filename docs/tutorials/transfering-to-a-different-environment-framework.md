@@ -1,7 +1,7 @@
 # Tutorial: Swapping in a new environment
 
 ## Introduction
-This tutorial was designed as a continuation of the `Robothor Pointnav Tutorial` and explains
+This tutorial was designed as a continuation of the `Robothor PointNav Tutorial` and explains
 how to modify the experiment config created in that tutorial to work with the iTHOR and
 Habitat environments.
 
@@ -19,11 +19,11 @@ the path parameter to point to an iTHOR dataset rather than the RoboTHOR one.
 
 ```python
     # Dataset Parameters
-    TRAIN_DATASET_DIR = "dataset/ithor/objectnav/train"
-    VAL_DATASET_DIR = "dataset/ithor/objectnav/val"
+    TRAIN_DATASET_DIR = "datasets/ithor-pointnav/train"
+    VAL_DATASET_DIR = "datasets/ithor-pointnav/val"
 ```
 
-That's it!
+We also have to download the `iTHOR-PointNav` dataset, following [these instructions](../installation/download-datasets.md).
 
 We might also want to modify the `tag` method to accurately reflect our config but this will not change
 the behavior at all and is merely a bookkeeping convenience.
@@ -35,6 +35,9 @@ the behavior at all and is merely a bookkeeping convenience.
 
 ## RoboTHOR to Habitat
 ![Habitat Framework](../img/habitat_framework.jpg)
+
+To train experiments using the Habitat framework we need to install it following [these instructions](../installation/installation-framework.md).
+
 Since the roboTHOR and Habitat simulators are sufficiently different and have different parameters to configure
 this transformation takes a bit more effort, but we only need to modify the environment config and TaskSampler (we
 have to change the former because the habitat simulator accepts a different format of configuration and the latter
@@ -152,13 +155,6 @@ Finally we need to replace the task sampler and its argument generating function
 ```
 
 As we can see this code looks very similar as well, we simply need to pass slightly different parameters.
-
-## Running a Test
-With the setup complete, we should be able to run a test using the exact same command as in the last tutorial:
-```bash
-python ddmain.py -o projects/pointnav_transfer_turotial/ -c projects/pointnav_robothor_rgb/weights/<REDACTED> -t -b projects/pointnav_robothor_rgb/experiments pointnav_robothor_rgb_ddppo
-```
-This should test the model trained in RoboTHOR on either iTHOR or Habitat (depending on which modifications we made).
 
 ## Conclusion
 In this tutorial, we learned how to modify our experiment configurations to work with different environments. By
