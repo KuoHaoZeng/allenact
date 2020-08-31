@@ -363,7 +363,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             reward += 1.0 if self._success else -1.0
             # reward += 0.1 / self._distance_to_target()
         
-        # print(reward)
+        print(reward)
         return float(reward)
 
     def metrics(self) -> Dict[str, Any]:
