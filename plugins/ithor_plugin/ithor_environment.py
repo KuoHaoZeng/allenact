@@ -1233,6 +1233,10 @@ class IThorArmEnvironment(IThorEnvironment):
         state['y'] = random.uniform(-0.1, 0.1)
         state['z'] = random.uniform(0.2, 0.3)
 
+        # state['x'] = random.uniform(-0.3, 0.3)
+        # state['y'] = random.uniform(-0.3, 0.3)
+        # state['z'] = random.uniform(0.1, 0.3)
+
         self.controller.step(
             action='MoveMidLevelArmHeight',
             y = MID_LEVEL_ARM_HEIGHT,
@@ -1292,8 +1296,8 @@ class IThorArmEnvironment(IThorEnvironment):
         if seed is not None:
             random.seed(seed)
         
-        xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
-        # xyz = random.choice(self.currently_reachable_points_given_position(object_position))
+        # xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
+        xyz = random.choice(self.currently_reachable_points_given_position(object_position))
         horizon = random.choice([30]) # look 30 degree down
         state = copy.copy(xyz)
         state["horizon"] = horizon
