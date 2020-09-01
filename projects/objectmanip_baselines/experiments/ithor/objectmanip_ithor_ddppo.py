@@ -67,13 +67,13 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
         return "Objectmanip-iTHOR-DDPPO"
 
     def training_pipeline(self, **kwargs):
-        ppo_steps = int(6e4)
+        ppo_steps = int(1e7)
         lr = 3e-4
         num_mini_batch = 1
-        update_repeats = 4
+        update_repeats = 3
         num_steps = 128
-        save_interval = 10000
-        log_interval = 1280
+        save_interval = 100000
+        log_interval = 5000
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95
