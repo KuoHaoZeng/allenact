@@ -51,7 +51,7 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
             # include_private_scenes=False,
             player_screen_height=self.CAMERA_HEIGHT,
             player_screen_width=self.CAMERA_WIDTH,
-            local_thor_build="/home/jiasen/Code/ai2thor/unity/builds/thor-arm_thor-Linux64" #'/home/jiasenl/code/builds/thor-arm_thor-Linux64',
+            local_thor_build="/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64" #'/home/jiasenl/code/builds/thor-arm_thor-Linux64',
         )
 
         self.NUM_PROCESSES = 1

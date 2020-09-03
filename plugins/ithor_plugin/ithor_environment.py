@@ -1215,8 +1215,6 @@ class IThorArmEnvironment(IThorEnvironment):
 
         return object_poses
 
-
-
     def randomize_arm_pose(self, seed: int = None) -> Dict:
         if seed is not None:
             random.seed(seed)
@@ -1225,17 +1223,10 @@ class IThorArmEnvironment(IThorEnvironment):
         if self.object_in_hand():
             self.controller.step(action='DropMidLevelHand')
 
-        # z [0, 1]
-        # x [-1, 1]z
-        # y [-1, 1]
         state = {}
         state['x'] = random.uniform(0.2, 0.3)
         state['y'] = random.uniform(-0.1, 0.1)
         state['z'] = random.uniform(0.2, 0.3)
-
-        # state['x'] = random.uniform(-0.3, 0.3)
-        # state['y'] = random.uniform(-0.3, 0.3)
-        # state['z'] = random.uniform(0.1, 0.3)
 
         self.controller.step(
             action='MoveMidLevelArmHeight',
@@ -1296,8 +1287,8 @@ class IThorArmEnvironment(IThorEnvironment):
         if seed is not None:
             random.seed(seed)
         
-        # xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
-        xyz = random.choice(self.currently_reachable_points_given_position(object_position))
+        xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
+        # xyz = random.choice(self.currently_reachable_points_given_position(object_position))
         horizon = random.choice([30]) # look 30 degree down
         state = copy.copy(xyz)
         state["horizon"] = horizon
@@ -1328,46 +1319,10 @@ class IThorArmEnvironment(IThorEnvironment):
         
         return reachable_points
     
-    def arm_jnt2_position_given_point(self, rotation, position):
-        
-        if rotation == 0:
-            arm_jnt2_position = {'x': position['x'], 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z'] + ARM_2_JNT_OFFSET_X}
-        elif rotation == 90:
-            arm_jnt2_position = {'x': position['x'] + ARM_2_JNT_OFFSET_X, 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z']}            
-        elif rotation == 180:
-            arm_jnt2_position = {'x': position['x'], 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z'] - ARM_2_JNT_OFFSET_X}
-        elif rotation == 270:
-            arm_jnt2_position = {'x': position['x'] - ARM_2_JNT_OFFSET_X, 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z']}
 
-        return arm_jnt2_position
-    
     def get_current_arm_coordinate(self):
 
-        # TODO: This seems not working state, need double care.
-        hand_target =  self.last_event.metadata['arm']['handTarget']
-        robot_arm_1_jnt = self.last_event.metadata['arm']['joints'][0]['position']
-        rotation_y = self.last_event.metadata['agent']['rotation']['y']
-        state = {}
-        # BUG: not sure why y is inverse?
-        if rotation_y == 0:
-            state['x'] = -(robot_arm_1_jnt['x'] - hand_target['x'])
-            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
-            state['z'] = -(robot_arm_1_jnt['z'] - hand_target['z'])
-        elif rotation_y == 90:
-            state['x'] = (robot_arm_1_jnt['z'] - hand_target['z']) 
-            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
-            state['z'] = -(robot_arm_1_jnt['x'] - hand_target['x'])
-        elif rotation_y == 180:
-            state['x'] = (robot_arm_1_jnt['x'] - hand_target['x']) 
-            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
-            state['z'] = (robot_arm_1_jnt['z'] - hand_target['z']) 
-        elif rotation_y == 270:
-            state['x'] = -(robot_arm_1_jnt['z'] - hand_target['z'])
-            state['y'] = -(robot_arm_1_jnt['y'] - hand_target['y'])
-            state['z'] = (robot_arm_1_jnt['x'] - hand_target['x'])
-        else:
-            assert False 
-        return state
+        return self.last_event.metadata['arm']['joints'][3]['rootRelativePosition']
 
     def check_breaking_objects(self):
         """check whether there is breaking objects in current env"""
