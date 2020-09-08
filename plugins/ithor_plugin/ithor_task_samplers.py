@@ -332,31 +332,31 @@ class ObjectManipTaskSampler(TaskSampler):
             return None
 
         scene = self.sample_scene(force_advance_scene)
-
+        scene_reset = False
         if self.env is not None:
             if scene.replace("_physics", "") == self.env.scene_name.replace("_physics", "") and not self.env.check_breaking_objects():
+                # restore pose here
+                agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
+                arm_pose = self.env.randomize_arm_pose()
+                arm_pose = self.env.get_current_arm_coordinate()
+
                 if len(self.env._objects_in_hand) > 0:
                     self.env.controller.step(action='DropMidLevelHand')
                 self.env.restore_object(self._init_objects_pose)
             else:
                 self.env.reset(scene)
                 self._init_objects_pose = self.env.get_last_object_poses()
+                scene_reset = True
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
             self._init_objects_pose = self.env.get_last_object_poses()
+            scene_reset = True
 
-        # TODO: to determine whether the agent can reach the target arm pose, the self.last_action 
-        # requires the agent to return all feasible points, can we do something similar here?  
-        agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
-
-        # TODO: seems we need to make the pose first, otherwise, there will be collisions when 
-        # setting the arm.
-        arm_pose = self.env.randomize_arm_pose()
-        arm_pose = self.env.get_current_arm_coordinate()
-        # self.env.controller.step(action='SetMidLevelHandRadius', radius=0.1)
-
-        self.env._objects_in_hand = []
+        if scene_reset:
+            agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
+            arm_pose = self.env.randomize_arm_pose()
+            arm_pose = self.env.get_current_arm_coordinate()
 
         object_types_in_scene = set(
             [o["objectType"] for o in self.env.last_event.metadata["objects"]]

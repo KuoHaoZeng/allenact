@@ -1318,10 +1318,21 @@ class IThorArmEnvironment(IThorEnvironment):
                 reachable_points.append(point)
         
         return reachable_points
-    
+
+    def arm_jnt2_position_given_point(self, rotation, position):
+
+        if rotation == 0:
+            arm_jnt2_position = {'x': position['x'], 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z'] + ARM_2_JNT_OFFSET_X}
+        elif rotation == 90:
+            arm_jnt2_position = {'x': position['x'] + ARM_2_JNT_OFFSET_X, 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z']}            
+        elif rotation == 180:
+            arm_jnt2_position = {'x': position['x'], 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z'] - ARM_2_JNT_OFFSET_X}
+        elif rotation == 270:
+            arm_jnt2_position = {'x': position['x'] - ARM_2_JNT_OFFSET_X, 'y': position['y'] + ARM_2_JNT_OFFSET_Y, 'z': position['z']}
+
+        return arm_jnt2_position
 
     def get_current_arm_coordinate(self):
-
         return self.last_event.metadata['arm']['joints'][3]['rootRelativePosition']
 
     def check_breaking_objects(self):
@@ -1386,7 +1397,6 @@ class IThorArmEnvironment(IThorEnvironment):
             # self._arm_move_success = self.check_arm_move_success(current_arm_state)
             # if self._arm_move_success == False:
             self.last_action_success = self.check_arm_move_success(current_arm_state)
-            # print("arm_move_success",  self.last_action_success)
 
         elif "PickUpMidLevelHand" in action:
             event = self.controller.step(action='WhatObjectsCanHandPickUp')
