@@ -343,7 +343,7 @@ class ObjectManipTaskSampler(TaskSampler):
                 arm_pose = self.env.randomize_arm_pose()
                 arm_pose = self.env.get_current_arm_coordinate()
 
-                if len(self.env._objects_in_hand) > 0:
+                if len(self.env.last_event.metadata['arm']['HeldObjects']) > 0:
                     self.env.controller.step(action='DropMidLevelHand')
                 self.env.restore_object(self._init_objects_pose)
                 self.env.all_objects_over_time = []

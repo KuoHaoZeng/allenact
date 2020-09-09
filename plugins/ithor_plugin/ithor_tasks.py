@@ -356,8 +356,19 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             # check target object in hand.
             for o in self.env.last_event.metadata['arm']['HeldObjects']:
                 if self.task_info["object_type"] in o:
-                    # check the inital object y-axis.
-                    for self.env.all_objects_over_time[0]
+                    # check the initial object y-axis.
+                    # for self.env.all_objects_over_time
+                    initial_object_sets = self.env.all_objects_over_time[0]
+                    for init_obj in initial_object_sets:
+                        if init_obj['objectId'] == o:
+                            # check Y location.
+                            # current Y location.
+                            current_obj = self.env.all_objects_with_properties({'objectId':o})[0] 
+                            print(current_obj['position']['y'] - init_obj['position']['y'])
+                            if current_obj['position']['y'] - init_obj['position']['y'] > 0.2:
+                                return True
+
+        return False
 
     def _is_goal_object_in_hand(self)-> bool:
         """Check if the goal object is in hand.

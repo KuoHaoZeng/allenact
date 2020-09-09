@@ -36,10 +36,11 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
     # Easy setting
     EASY = False
     ACTION_TYPES = sorted(["pick-up"])
-    OBJECT_TYPES = sorted(["Egg", "Pot", "Apple", "Potato"])
-    TRAIN_SCENES = ["FloorPlan3_physics"]
-    VALID_SCENES = ["FloorPlan3_physics"]
-    TEST_SCENES = ["FloorPlan3_physics"]
+    OBJECT_TYPES = sorted(["Bowl"])
+    # OBJECT_TYPES = sorted(["Egg", "Pot", "Apple", "Potato"])
+    TRAIN_SCENES = ["FloorPlan1_physics"]
+    VALID_SCENES = ["FloorPlan1_physics"]
+    TEST_SCENES = ["FloorPlan1_physics"]
 
     # Hard setting
     # EASY = False
@@ -66,7 +67,8 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
         "player_screen_height": SCREEN_SIZE,
         "player_screen_width": SCREEN_SIZE,
         "quality": "Very Low",
-        "local_thor_build": "/Users/jiasenl/Code/ai2thor/unity/builds/thor-local-OSXIntel64.app/Contents/MacOS/AI2-Thor" # "/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64",
+        # "local_thor_build": "/Users/jiasenl/Code/ai2thor/unity/builds/thor-local-OSXIntel64.app/Contents/MacOS/AI2-Thor",
+        "local_thor_build": "/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64"
     }
 
     MAX_STEPS = 128

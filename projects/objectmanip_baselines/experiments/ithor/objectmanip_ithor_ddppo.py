@@ -12,7 +12,7 @@ from projects.objectmanip_baselines.experiments.ithor.objectmanip_ithor_base imp
 from projects.objectmanip_baselines.models.object_manip_models import (
     ObjectManipBaselineActorCritic,
 )
-from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor,
+from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor, GoalActionTypeThorSensor, 
                                                 ArmCollisionSensor, CurrentArmStateThorSensor)
 
 from plugins.habitat_plugin.habitat_preprocessors import ResnetPreProcessorHabitat
@@ -32,7 +32,8 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
                 use_resnet_normalization=True,
                 uuid="rgb_lowres",
             ),
-            GoalObjectTypeThorSensor(object_types=self.TARGET_TYPES,),
+            GoalObjectTypeThorSensor(object_types=self.OBJECT_TYPES,),
+            GoalActionTypeThorSensor(action_types=self.ACTION_TYPES,),
             ArmCollisionSensor(),
             CurrentArmStateThorSensor(),
         ]
@@ -57,6 +58,7 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
 
         self.OBSERVATIONS = [
             "rgb_resnet",
+            "goal_action_type_ind",
             "goal_object_type_ind",
             "current_arm_state",
             "arm_collision_state",
@@ -105,7 +107,8 @@ class ObjectManipThorRGBPPOExperimentConfig(ObjectManipThorBaseConfig):
         return ObjectManipBaselineActorCritic(
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
-            goal_sensor_uuid="goal_object_type_ind",
+            goal_object_uuid="goal_object_type_ind",
+            goal_action_uuid="goal_action_type_ind",
             arm_collision_uuid="arm_collision_state",
             arm_state_uuid="current_arm_state",
             hidden_size=512,
