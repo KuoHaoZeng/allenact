@@ -60,7 +60,7 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
             local_thor_build='/home/jiasenl/code/builds/thor-my_great_build-Linux64',
         )
 
-        self.NUM_PROCESSES = 1
+        self.NUM_PROCESSES = 28
         self.TRAIN_GPU_IDS = [0,1,2,3,4,5,6]
         self.VALID_GPU_IDS = [7]
         self.TEST_GPU_IDS = [7]

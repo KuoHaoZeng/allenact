@@ -319,7 +319,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         if action_str == END:
             self._took_end_action = True
             self._success = self._check_goal_success()
-            self.last_action_success = self._success
+            self.last_action_success = self._success > 0
         else:
             self.env.step({"action": action_str})
             self.last_action_success = self.env.last_action_success
@@ -365,10 +365,12 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
                             # current Y location.
                             current_obj = self.env.all_objects_with_properties({'objectId':o})[0] 
                             print(current_obj['position']['y'] - init_obj['position']['y'])
-                            if current_obj['position']['y'] - init_obj['position']['y'] > 0.2:
-                                return True
+                            if current_obj['position']['y'] - init_obj['position']['y'] > 0.1:
+                                return 1
+                            else:
+                                return 0.5
 
-        return False
+        return 0
 
     def _is_goal_object_in_hand(self)-> bool:
         """Check if the goal object is in hand.
@@ -389,7 +391,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
             reward += -0.03
 
         if self._took_end_action:
-            reward += 1.0 if self._success else -1.0
+            reward += 1.0 * self._success if self._success > 0 else -1.0
         
         # print(reward)
         return float(reward)
