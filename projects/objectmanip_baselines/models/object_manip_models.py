@@ -44,11 +44,13 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         self,
         action_space: gym.spaces.Discrete,
         observation_space: SpaceDict,
-        goal_sensor_uuid: str,
+        goal_action_uuid: str,
+        goal_object_uuid: str,
         arm_collision_uuid: str,
         arm_state_uuid: str,
         hidden_size=512,
         object_type_embedding_dim=8,
+        action_type_embedding_dim=8,
         arm_collision_embedding_dim=8,
         arm_state_embedding_dim=64,
         trainable_masked_hidden_state: bool = False,
@@ -62,20 +64,23 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         super().__init__(action_space=action_space, observation_space=observation_space)
 
         self.arm_state_uuid = arm_state_uuid
-        self.goal_sensor_uuid = goal_sensor_uuid
+        self.goal_action_uuid = goal_action_uuid
+        self.goal_object_uuid = goal_object_uuid
         self.arm_collision_uuid = arm_collision_uuid
 
-        self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
+        self._n_object_types = self.observation_space.spaces[self.goal_object_uuid].n
+        self._n_action_types = self.observation_space.spaces[self.goal_action_uuid].n
         self._n_collision_state = self.observation_space.spaces[self.arm_collision_uuid].n
         self._n_arm_state = self.observation_space.spaces[self.arm_state_uuid].shape[0]
 
         self._hidden_size = hidden_size
         self.object_type_embedding_size = object_type_embedding_dim
+        self.action_type_embedding_size = action_type_embedding_dim
 
         self.visual_encoder = SimpleCNN(self.observation_space, self._hidden_size)
         
         self.state_encoder = RNNStateEncoder(
-            (0 if self.is_blind else self._hidden_size) + object_type_embedding_dim + arm_collision_embedding_dim + arm_state_embedding_dim,
+            (0 if self.is_blind else self._hidden_size) + action_type_embedding_dim + object_type_embedding_dim + arm_collision_embedding_dim + arm_state_embedding_dim,
             self._hidden_size,
             trainable_masked_hidden_state=trainable_masked_hidden_state,
             num_layers=num_rnn_layers,
@@ -90,6 +95,10 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
             embedding_dim=object_type_embedding_dim,
         )
 
+        self.action_type_embedding = nn.Embedding(
+            num_embeddings=self._n_action_types,
+            embedding_dim=action_type_embedding_dim,
+        )
         self.arm_state_embedding = nn.Linear(self._n_arm_state, arm_state_embedding_dim)
 
         self.arm_collision_embedding = nn.Embedding(
@@ -132,8 +141,15 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
     ) -> torch.FloatTensor:
         """Get the object type encoding from input batched observations."""
         return self.object_type_embedding(  # type:ignore
-            observations[self.goal_sensor_uuid].to(torch.int64)
+            observations[self.goal_object_uuid].to(torch.int64)
         )
+
+    def get_action_type_encoding(
+        self,  observations: Dict[str, torch.FloatTensor]
+    ) -> torch.FloatTensor:
+        return self.action_type_embedding(  # type:ignore
+            observations[self.goal_action_uuid].to(torch.int64)
+        )        
 
     def get_arm_state_encoding(
         self, observations: Dict[str, torch.FloatTensor]
@@ -171,10 +187,11 @@ class ObjectManipBaselineActorCritic(ActorCriticModel[CategoricalDistr]):
         # Returns
         Tuple of the `ActorCriticOutput` and recurrent hidden state.
         """
-        target_encoding = self.get_object_type_encoding(observations)
+        target_object_encoding = self.get_object_type_encoding(observations)
+        target_action_encoding = self.get_action_type_encoding(observations)
         arm_collision_encoding = self.get_arm_collision_encoding(observations)
         arm_state_encoding = self.get_arm_state_encoding(observations)
-        x = [target_encoding, arm_collision_encoding, arm_state_encoding]
+        x = [target_object_encoding, target_action_encoding, arm_collision_encoding, arm_state_encoding]
 
         if not self.is_blind:
             perception_embed = self.visual_encoder(observations)

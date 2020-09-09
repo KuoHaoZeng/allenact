@@ -318,7 +318,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
 
         if action_str == END:
             self._took_end_action = True
-            self._success = self._is_goal_object_in_hand()
+            self._success = self._check_goal_success()
             self.last_action_success = self._success
         else:
             self.env.step({"action": action_str})
@@ -338,14 +338,32 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         assert mode == "rgb", "only rgb rendering is implemented"
         return self.env.current_frame
 
+    def _check_goal_success(self)-> bool:
+        """
+        Check whether the goal is sucess.
+        """
+        # what kind of information do we need to check the goal. 
+
+        # Pick up: 1: Object in hand, 2: goal object current height - orginal height > threshold.
+        # Cut: 1: Knife in hand, 2: knife position and goal object position < threshold. 3: this will trigger the object state change (is_sliced = True). 
+        # - problems 
+        # 1: (how to consider the trajectory here? )
+        # 2: the knife orientation is hard to control. 
+
+        # Wipe: 1: Cloth in hand, 2: Cloth and   
+        
+        if self.task_info["action_type"] == "pick-up":
+            # check target object in hand.
+            for o in self.env.last_event.metadata['arm']['HeldObjects']:
+                if self.task_info["object_type"] in o:
+                    # check the inital object y-axis.
+                    for self.env.all_objects_over_time[0]
+
     def _is_goal_object_in_hand(self)-> bool:
         """Check if the goal object is in hand.
         """
-        # TODO: This is a hack for now.
-        # object_in_hand = self.env._objects_in_hand
         
         object_in_hand = False
-        # print(self.env._objects_in_hand)
         for o in self.env._objects_in_hand:
             if self.task_info["object_type"] in o:
                 object_in_hand = True
@@ -361,7 +379,6 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
 
         if self._took_end_action:
             reward += 1.0 if self._success else -1.0
-            # reward += 0.1 / self._distance_to_target()
         
         # print(reward)
         return float(reward)

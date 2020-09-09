@@ -66,7 +66,34 @@ class GoalObjectTypeThorSensor(Sensor):
     ) -> Any:
         return self.object_type_to_ind[task.task_info["object_type"]]
 
+class GoalActionTypeThorSensor(Sensor):
+    def __init__(
+        self,
+        action_types: List[str],
+        uuid: str = "goal_action_type_ind",
+        **kwargs: Any
+    ):
+        self.ordered_action_types = list(action_types)
+        assert self.ordered_action_types == sorted(
+            self.ordered_action_types
+        ), "action types input to goal action type sensor must be ordered"
 
+        self.action_type_to_ind = {
+            ot: i for i, ot in enumerate(self.ordered_action_types)
+        }
+
+        observation_space = gym.spaces.Discrete(len(self.ordered_action_types))
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+        self,
+        env: IThorEnvironment,
+        task: Optional[ObjectNavTask],
+        *args: Any,
+        **kwargs: Any
+    ) -> Any:
+        return self.action_type_to_ind[task.task_info["action_type"]]
 
 class CurrentArmStateThorSensor(Sensor):
     """

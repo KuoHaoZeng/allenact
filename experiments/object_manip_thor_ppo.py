@@ -14,7 +14,7 @@ from core.base_abstractions.experiment_config import ExperimentConfig
 from core.base_abstractions.sensor import SensorSuite
 from core.base_abstractions.task import TaskSampler
 
-from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor,
+from plugins.ithor_plugin.ithor_sensors import (RGBSensorThor, GoalObjectTypeThorSensor, GoalActionTypeThorSensor, 
                                                 ArmCollisionSensor, CurrentArmStateThorSensor)
 
 from plugins.ithor_plugin.ithor_task_samplers import ObjectManipTaskSampler
@@ -35,10 +35,11 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
     # Easy setting
     EASY = False
-    OBJECT_TYPES = sorted(["Bowl"])
-    TRAIN_SCENES = ["FloorPlan1_physics"]
-    VALID_SCENES = ["FloorPlan1_physics"]
-    TEST_SCENES = ["FloorPlan1_physics"]
+    ACTION_TYPES = sorted(["pick-up"])
+    OBJECT_TYPES = sorted(["Egg", "Pot", "Apple", "Potato"])
+    TRAIN_SCENES = ["FloorPlan3_physics"]
+    VALID_SCENES = ["FloorPlan3_physics"]
+    TEST_SCENES = ["FloorPlan3_physics"]
 
     # Hard setting
     # EASY = False
@@ -55,6 +56,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
                 "use_resnet_normalization": True,
             }
         ),
+        GoalActionTypeThorSensor(**{"action_types": ACTION_TYPES}),
         GoalObjectTypeThorSensor(**{"object_types": OBJECT_TYPES}),
         ArmCollisionSensor(),
         CurrentArmStateThorSensor(),
@@ -64,7 +66,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
         "player_screen_height": SCREEN_SIZE,
         "player_screen_width": SCREEN_SIZE,
         "quality": "Very Low",
-        "local_thor_build": "/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64",
+        "local_thor_build": "/Users/jiasenl/Code/ai2thor/unity/builds/thor-local-OSXIntel64.app/Contents/MacOS/AI2-Thor" # "/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64",
     }
 
     MAX_STEPS = 128
@@ -141,7 +143,8 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
         return ObjectManipBaselineActorCritic(
             action_space=gym.spaces.Discrete(len(ObjectManipTask.class_action_names())),
             observation_space=SensorSuite(cls.SENSORS).observation_spaces,
-            goal_sensor_uuid="goal_object_type_ind",
+            goal_action_uuid="goal_action_type_ind",
+            goal_object_uuid="goal_object_type_ind",
             arm_collision_uuid="arm_collision_state",
             arm_state_uuid="current_arm_state",
             hidden_size=512,
@@ -184,6 +187,7 @@ class ObjectManipThorPPOExperimentConfig(ExperimentConfig):
 
         return {
             "scenes": scenes[inds[process_ind] : inds[process_ind + 1]],
+            "action_types": self.ACTION_TYPES,
             "object_types": self.OBJECT_TYPES,
             "env_args": self.ENV_ARGS,
             "max_steps": self.MAX_STEPS,

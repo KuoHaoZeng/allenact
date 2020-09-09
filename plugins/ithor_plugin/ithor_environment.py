@@ -1158,9 +1158,8 @@ class IThorArmEnvironment(IThorEnvironment):
         self.start(None)
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
-        self._objects_in_hand = []
-        # self._arm_move_success = True
-        
+        self.all_objects_over_time: Optional[List[Dict]] = []
+
     def start(
         self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
     ) -> None:
@@ -1198,6 +1197,57 @@ class IThorArmEnvironment(IThorEnvironment):
             
         self._started = True
         self.reset(scene_name=scene_name, move_mag=move_mag, **kwargs)
+
+
+    def reset(
+        self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
+    ):
+        """Resets the ai2thor in a new scene.
+
+        Resets ai2thor into a new scene and initializes the scene/agents with
+        prespecified settings (e.g. move magnitude).
+
+        # Parameters
+
+        scene_name : The scene to load.
+        move_mag : The amount of distance the agent moves in a single `MoveAhead` step.
+        kwargs : additional kwargs, passed to the controller "Initialize" action.
+        """
+        self._move_mag = move_mag
+        self._grid_size = self._move_mag
+
+        if scene_name is None:
+            scene_name = self.controller.last_event.metadata["sceneName"]
+        self.controller.reset(scene_name)
+
+        self.controller.step(
+            {
+                "action": "Initialize",
+                "gridSize": self._grid_size,
+                "visibilityDistance": self._visibility_distance,
+                "fov": self._fov,
+                "makeAgentsVisible": self.make_agents_visible,
+                "alwaysReturnVisibleRange": self._always_return_visible_range,
+                **kwargs,
+            }
+        )
+
+        if self.object_open_speed != 1.0:
+            self.controller.step(
+                {"action": "ChangeOpenSpeed", "x": self.object_open_speed}
+            )
+
+        self._initially_reachable_points = None
+        self._initially_reachable_points_set = None
+        self.controller.step({"action": "GetReachablePositions"})
+        if not self.controller.last_event.metadata["lastActionSuccess"]:
+            warnings.warn(
+                "Error when getting reachable points: {}".format(
+                    self.controller.last_event.metadata["errorMessage"]
+                )
+            )
+        self._initially_reachable_points = self.last_action_return
+        self.all_objects_over_time: Optional[List[Dict]] = []
 
     def restore_object(self, object_poses) -> None:
         # teleport the object back to the initial scene environment. 
@@ -1287,8 +1337,8 @@ class IThorArmEnvironment(IThorEnvironment):
         if seed is not None:
             random.seed(seed)
         
-        xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
-        # xyz = random.choice(self.currently_reachable_points_given_position(object_position))
+        # xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
+        xyz = random.choice(self.currently_reachable_points_given_position(object_position))
         horizon = random.choice([30]) # look 30 degree down
         state = copy.copy(xyz)
         state["horizon"] = horizon
@@ -1377,34 +1427,24 @@ class IThorArmEnvironment(IThorEnvironment):
             elif action == 'MoveArmDZ':
                 current_arm_state['z'] -= MOVE_HAND_CONSTANT                
 
-            if len(self._objects_in_hand) == 0:
-                sr = self.controller.step(
-                        action='MoveMidLevelArm',
-                        position=current_arm_state,
-                        speed = 1.0,
-                        returnToStart = False, 
-                        handCameraSpace = False,
-                        stopArmMovementOnContact = True)
-            else:
-                sr = self.controller.step(
-                        action='MoveMidLevelArm',
-                        position=current_arm_state,
-                        speed = 1.0,
-                        returnToStart = False, 
-                        handCameraSpace = False,
-                        stopArmMovementOnContact = False)
+            sr = self.controller.step(
+                    action='MoveMidLevelArm',
+                    position=current_arm_state,
+                    speed = 1.0,
+                    returnToStart = False, 
+                    handCameraSpace = False,
+                    stopArmMovementOnContact = False)
 
-            # self._arm_move_success = self.check_arm_move_success(current_arm_state)
-            # if self._arm_move_success == False:
             self.last_action_success = self.check_arm_move_success(current_arm_state)
 
         elif "PickUpMidLevelHand" in action:
-            event = self.controller.step(action='WhatObjectsCanHandPickUp')
-            self._objects_in_hand = event.metadata['actionReturn']
             sr = self.controller.step(action='PickUpMidLevelHand')
         else:
             sr = self.controller.step(action_dict)
-        
+
+        # keep track of all objects. 
+        self.all_objects_over_time.append(self.all_objects())
+
         # if self.restrict_to_initially_reachable_points:
         #     self._snap_agent_to_initially_reachable()
 

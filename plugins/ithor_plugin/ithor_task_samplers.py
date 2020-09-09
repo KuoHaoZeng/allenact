@@ -202,6 +202,7 @@ class ObjectManipTaskSampler(TaskSampler):
     def __init__(
             self,
             scenes: List[str],
+            action_types: str,
             object_types: str,
             sensors: List[Sensor],
             max_steps: int,
@@ -216,6 +217,7 @@ class ObjectManipTaskSampler(TaskSampler):
             **kwargs
     ) -> None:
         self.env_args = env_args
+        self.action_types = action_types
         self.object_types = object_types
         self.scenes = scenes
         self.grid_size = 0.25
@@ -332,31 +334,26 @@ class ObjectManipTaskSampler(TaskSampler):
             return None
 
         scene = self.sample_scene(force_advance_scene)
-        scene_reset = False
+        
+        # make sure the arm is not touch with the object. 
+
         if self.env is not None:
             if scene.replace("_physics", "") == self.env.scene_name.replace("_physics", "") and not self.env.check_breaking_objects():
-                # restore pose here
-                agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
+                # restore arm pose here
                 arm_pose = self.env.randomize_arm_pose()
                 arm_pose = self.env.get_current_arm_coordinate()
 
                 if len(self.env._objects_in_hand) > 0:
                     self.env.controller.step(action='DropMidLevelHand')
                 self.env.restore_object(self._init_objects_pose)
+                self.env.all_objects_over_time = []
             else:
                 self.env.reset(scene)
                 self._init_objects_pose = self.env.get_last_object_poses()
-                scene_reset = True
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene)
             self._init_objects_pose = self.env.get_last_object_poses()
-            scene_reset = True
-
-        if scene_reset:
-            agent_pose = self.env.randomize_reachable_agent_location_given_object(self.object_types)
-            arm_pose = self.env.randomize_arm_pose()
-            arm_pose = self.env.get_current_arm_coordinate()
 
         object_types_in_scene = set(
             [o["objectType"] for o in self.env.last_event.metadata["objects"]]
@@ -367,6 +364,14 @@ class ObjectManipTaskSampler(TaskSampler):
             if ot in object_types_in_scene:
                 task_info["object_type"] = ot
                 break
+
+        for at in random.sample(self.action_types, len(self.action_types)):
+            task_info["action_type"] = at
+            break
+
+        arm_pose = self.env.randomize_arm_pose()
+        arm_pose = self.env.get_current_arm_coordinate()
+        agent_pose = self.env.randomize_reachable_agent_location_given_object([task_info["object_type"]])
 
         if len(task_info) == 0:
             get_logger().warning(
