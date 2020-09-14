@@ -1274,9 +1274,9 @@ class IThorArmEnvironment(IThorEnvironment):
             self.controller.step(action='DropMidLevelHand')
 
         state = {}
-        state['x'] = random.uniform(0.2, 0.3)
-        state['y'] = random.uniform(-0.1, 0.1)
-        state['z'] = random.uniform(0.2, 0.3)
+        state['x'] = random.uniform(0.2, 0.2)
+        state['y'] = random.uniform(0, 0)
+        state['z'] = random.uniform(0.2, 0.2)
 
         self.controller.step(
             action='MoveMidLevelArmHeight',
@@ -1336,9 +1336,11 @@ class IThorArmEnvironment(IThorEnvironment):
         """Returns a random reachable location in the scene."""
         if seed is not None:
             random.seed(seed)
-        
-        xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
-        #xyz = random.choice(self.currently_reachable_points_given_position(object_position))
+        #  'position': {'x': -1.0, 'y': 1.123206, 'z': -1.25},
+
+        xyz = {'rotation': 270, 'x': -1.0, 'y': 1.123206, 'z': -1.25}
+        # xyz = {'rotation': 270, 'x': 0.75, 'y': 0.900999128818512, 'z': -1.25}
+        # xyz = random.choice(self.currently_reachable_points_given_position(object_position))
         horizon = random.choice([30]) # look 30 degree down
         state = copy.copy(xyz)
         state["horizon"] = horizon

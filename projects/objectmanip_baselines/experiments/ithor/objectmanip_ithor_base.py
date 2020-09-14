@@ -34,7 +34,11 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
                 # "SoapBottle",
                 # "Television",
                 # "Toaster",
-                "Bowl",
+                # "Bowl",
+                "Egg", 
+                "Pot", 
+                "Apple", 
+                "Potato"
             ]
         )
         self.ACTION_TYPES = sorted(
@@ -56,14 +60,14 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
             # include_private_scenes=False,
             player_screen_height=self.CAMERA_HEIGHT,
             player_screen_width=self.CAMERA_WIDTH,
-            # local_thor_build="/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64" #'/home/jiasenl/code/builds/thor-my_great_build-Linux64',
-            local_thor_build='/home/jiasenl/code/builds/thor-my_great_build-Linux64',
+            local_thor_build="/home/jiasen/Code/ai2thor/unity/builds/thor-my_great_build-Linux64" #'/home/jiasenl/code/builds/thor-my_great_build-Linux64',
+            # local_thor_build='/home/jiasenl/code/builds/thor-my_great_build-Linux64',
         )
 
-        self.NUM_PROCESSES = 28
-        self.TRAIN_GPU_IDS = [0,1,2,3,4,5,6]
-        self.VALID_GPU_IDS = [7]
-        self.TEST_GPU_IDS = [7]
+        self.NUM_PROCESSES = 1#28
+        self.TRAIN_GPU_IDS = []#[0,1,2,3,4,5,6]
+        self.VALID_GPU_IDS = []#[7]
+        self.TEST_GPU_IDS = []#[7]
         self.ADVANCE_SCENE_ROLLOUT_PERIOD = 10 ** 13
 
         self.TRAIN_DATASET_DIR = "dataset/ithor/objectnav/train"
@@ -85,23 +89,23 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
             workers_per_device = 1
             gpu_ids = (
                 []
-                if not torch.cuda.is_available()
-                else self.TRAIN_GPU_IDS * workers_per_device
+                # if not torch.cuda.is_available()
+                # else self.TRAIN_GPU_IDS * workers_per_device
             )
             nprocesses = (
                 1
-                if not torch.cuda.is_available()
-                else self.split_num_processes(len(gpu_ids))
+                # if not torch.cuda.is_available()
+                # else self.split_num_processes(len(gpu_ids))
             )
             sampler_devices = self.TRAIN_GPU_IDS
             render_video = False
         elif mode == "valid":
             nprocesses = 1
-            gpu_ids = [] if not torch.cuda.is_available() else self.VALID_GPU_IDS
+            gpu_ids = [] # if not torch.cuda.is_available() else self.VALID_GPU_IDS
             render_video = False
         elif mode == "test":
             nprocesses = 1
-            gpu_ids = [] if not torch.cuda.is_available() else self.TEST_GPU_IDS
+            gpu_ids = [] # if not torch.cuda.is_available() else self.TEST_GPU_IDS
             render_video = False
         else:
             raise NotImplementedError("mode must be 'train', 'valid', or 'test'.")
@@ -158,7 +162,7 @@ class ObjectManipThorBaseConfig(ObjectManipBaseConfig):
             else scenes_dir + "/*.json.gz"
         )
         # scenes = [scene.split("/")[-1].split(".")[0] for scene in glob.glob(path)]
-        scenes = ['FloorPlan1_physics']
+        scenes = ['FloorPlan3_physics']
 
         if total_processes > len(scenes):  # oversample some scenes -> bias
             if total_processes % len(scenes) != 0:

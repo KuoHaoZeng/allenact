@@ -355,6 +355,7 @@ class ObjectManipTask(Task[IThorArmEnvironment]):
         if self.task_info["action_type"] == "pick-up":
             # check target object in hand.
             for o in self.env.last_event.metadata['arm']['HeldObjects']:
+                print(self.task_info["object_type"], o)
                 if self.task_info["object_type"] in o:
                     # check the initial object y-axis.
                     # for self.env.all_objects_over_time
