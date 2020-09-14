@@ -5,7 +5,6 @@ import itertools
 import json
 import os
 import queue
-import shutil
 import signal
 import time
 import traceback
@@ -24,7 +23,12 @@ from core.algorithms.onpolicy_sync.engine import (
     OnPolicyInference,
 )
 from core.base_abstractions.experiment_config import ExperimentConfig
-from utils.experiment_utils import ScalarMeanTracker, set_deterministic_cudnn, set_seed
+from utils.experiment_utils import (
+    ScalarMeanTracker,
+    set_deterministic_cudnn,
+    set_seed,
+    Builder,
+)
 from utils.misc_utils import all_equal, get_git_diff_of_project
 from utils.system import get_logger, find_free_port
 from utils.tensor_utils import SummaryWriter
@@ -33,7 +37,7 @@ from utils.tensor_utils import SummaryWriter
 # Instantiates train, validate, and test workers
 # Logging
 # Saves configs, makes folder for trainer models
-from utils.viz_utils import SimpleViz
+from utils.viz_utils import VizSuite
 
 
 class OnPolicyRunner(object):
@@ -41,10 +45,11 @@ class OnPolicyRunner(object):
         self,
         config: ExperimentConfig,
         output_dir: str,
-        loaded_config_src_files: Optional[Dict[str, Tuple[str, str]]],
+        loaded_config_src_files: Optional[Dict[str, str]],
         seed: Optional[int] = None,
         mode: str = "train",
         deterministic_cudnn: bool = False,
+        deterministic_agents: bool = False,
         mp_ctx: Optional[BaseContext] = None,
         multiprocessing_start_method: str = "forkserver",
         extra_tag: str = "",
@@ -57,7 +62,8 @@ class OnPolicyRunner(object):
         self.mp_ctx = self.init_context(mp_ctx, multiprocessing_start_method)
         self.extra_tag = extra_tag
         self.mode = mode
-        self.visualizer: Optional[SimpleViz] = None
+        self.visualizer: Optional[VizSuite] = None
+        self.deterministic_agents = deterministic_agents
 
         assert self.mode in [
             "train",
@@ -140,10 +146,13 @@ class OnPolicyRunner(object):
         return devices
 
     def get_visualizer(self, mode: str):
-        # Note: Avoid instantiating preprocessors in machine_params (use Builder if needed)
+        # Note: Avoid instantiating anything in machine_params (use Builder if needed)
         params = self.config.machine_params(mode)
         if "visualizer" in params and params["visualizer"] is not None:
-            self.visualizer = params["visualizer"]()  # it's a Builder!
+            if isinstance(params["visualizer"], Builder):
+                self.visualizer = params["visualizer"]()
+            else:
+                self.visualizer = params["visualizer"]
 
     @staticmethod
     def init_process(mode, id):
@@ -278,6 +287,7 @@ class OnPolicyRunner(object):
                     checkpoints_queue=self.queues["checkpoints"],
                     seed=12345,  # TODO allow same order for randomly sampled tasks? Is this any useful anyway?
                     deterministic_cudnn=self.deterministic_cudnn,
+                    deterministic_agents=self.deterministic_agents,
                     mp_ctx=self.mp_ctx,
                     device=device,
                     max_sampler_processes_per_worker=max_sampler_processes_per_worker,
@@ -323,6 +333,7 @@ class OnPolicyRunner(object):
                     checkpoints_queue=self.queues["checkpoints"],
                     seed=12345,  # TODO allow same order for randomly sampled tasks? Is this any useful anyway?
                     deterministic_cudnn=self.deterministic_cudnn,
+                    deterministic_agents=self.deterministic_agents,
                     mp_ctx=self.mp_ctx,
                     num_workers=num_testers,
                     device=devices[tester_it],
@@ -434,20 +445,35 @@ class OnPolicyRunner(object):
 
         get_logger().info("Git diff saved to {}".format(base_dir))
 
-        # Recursively saving configs
+        # Saving configs
         if self.loaded_config_src_files is not None:
-            for file in self.loaded_config_src_files:
-                base, module = self.loaded_config_src_files[file]
-                parts = module.split(".")
-
-                src_file = os.path.sep.join([base] + parts) + ".py"
-                assert os.path.isfile(src_file), "Config file {} not found".format(
-                    src_file
+            for src_path in self.loaded_config_src_files:
+                assert os.path.isfile(src_path), "Config file {} not found".format(
+                    src_path
                 )
+                src_path = os.path.abspath(src_path)
 
-                dst_file = os.path.join(base_dir, os.path.join(*parts[1:]),) + ".py"
-                os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-                shutil.copy(src_file, dst_file)
+                # To prevent overwriting files with the same name, we loop
+                # here until we find a prefix (if necessary) to prevent
+                # name collisions.
+                k = -1
+                while True:
+                    prefix = "" if k == -1 else "namecollision{}__".format(k)
+                    k += 1
+                    dst_path = os.path.join(
+                        base_dir, "{}{}".format(prefix, os.path.basename(src_path),),
+                    )
+                    if not os.path.exists(dst_path):
+                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                        with open(src_path, "r") as f:
+                            file_contents = f.read()
+                        with open(dst_path, "w") as f:
+                            f.write(
+                                "### THIS FILE ORIGINALLY LOCATED AT '{}'\n\n{}".format(
+                                    src_path, file_contents
+                                )
+                            )
+                        break
 
         get_logger().info("Config files saved to {}".format(base_dir))
 
@@ -517,7 +543,12 @@ class OnPolicyRunner(object):
             )
 
             for k in metrics:
-                log_writer.add_scalar("{}/".format(self.mode) + k, metrics[k], steps)
+                if "offpolicy" not in k:
+                    log_writer.add_scalar(
+                        "{}/".format(self.mode) + k, metrics[k], steps
+                    )
+                else:
+                    log_writer.add_scalar(k, metrics[k], steps)
                 message.append(k + " {:.3g}".format(metrics[k]))
 
         if not return_metrics:
@@ -525,16 +556,21 @@ class OnPolicyRunner(object):
         else:
             return message, metrics
 
-    def process_train_packages(self, log_writer, pkgs, last_steps=0, last_time=0.0):
+    def process_train_packages(
+        self, log_writer, pkgs, last_steps=0, last_offpolicy_steps=0, last_time=0.0
+    ):
         current_time = time.time()
 
-        pkg_types, payloads, all_steps = [vals for vals in zip(*pkgs)]
+        pkg_types, payloads, all_steps, all_offpolicy_steps = [
+            vals for vals in zip(*pkgs)
+        ]
 
         steps = all_steps[0]
+        offpolicy_steps = all_offpolicy_steps[0]
 
         all_info_types = [worker_pkgs for worker_pkgs in zip(*payloads)]
 
-        message = ["train {} steps:".format(steps)]
+        message = ["train {} steps {} offpolicy:".format(steps, offpolicy_steps)]
         for info_type in all_info_types:
             message += self.aggregate_infos(log_writer, info_type, steps)
         message += ["elapsed_time {:.3g}s".format(current_time - last_time)]
@@ -543,9 +579,15 @@ class OnPolicyRunner(object):
             fps = (steps - last_steps) / (current_time - last_time)
             message += ["approx_fps {:.3g}".format(fps)]
             log_writer.add_scalar("train/approx_fps", fps, steps)
+
+        if last_offpolicy_steps > 0:
+            fps = (offpolicy_steps - last_offpolicy_steps) / (current_time - last_time)
+            message += ["offpolicy/approx_fps {:.3g}".format(fps)]
+            log_writer.add_scalar("offpolicy/approx_fps", fps, steps)
+
         get_logger().info(" ".join(message))
 
-        return steps, current_time
+        return steps, offpolicy_steps, current_time
 
     def process_test_packages(
         self, log_writer, pkgs, all_results: Optional[List[Any]] = None
@@ -605,6 +647,7 @@ class OnPolicyRunner(object):
         # To aggregate/buffer metrics from trainers/testers
         collected = []
         last_train_steps = 0
+        last_offpolicy_steps = 0
         last_train_time = time.time()
         # test_steps = sorted(test_steps, reverse=True)
         test_results: List[Dict] = []
@@ -618,18 +661,21 @@ class OnPolicyRunner(object):
                         collected.append(package)
                         if len(collected) >= nworkers:
                             collected = sorted(
-                                collected, key=lambda x: x[2]
-                            )  # sort by num_steps
+                                collected, key=lambda x: (x[2], x[3])
+                            )  # sort by num_steps, offpolicy_steps
                             if (
                                 collected[nworkers - 1][2] == collected[0][2]
+                                and collected[nworkers - 1][3] == collected[0][3]
                             ):  # ensure nworkers have provided the same num_steps
                                 (
                                     last_train_steps,
+                                    last_offpolicy_steps,
                                     last_train_time,
                                 ) = self.process_train_packages(
                                     log_writer,
                                     collected[:nworkers],
                                     last_steps=last_train_steps,
+                                    last_offpolicy_steps=last_offpolicy_steps,
                                     last_time=last_train_time,
                                 )
                                 collected = collected[nworkers:]

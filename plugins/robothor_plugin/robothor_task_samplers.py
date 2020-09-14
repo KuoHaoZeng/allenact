@@ -261,9 +261,6 @@ class ObjectNavTaskSampler(TaskSampler):
         else:
             task_info["mirrored"] = False
 
-        # if self.reset_tasks is not None:
-        #     get_logger().debug("eval task_info {}".format(task_info))
-
         self._last_sampled_task = ObjectNavTask(
             env=self.env,
             sensors=self.sensors,
@@ -310,14 +307,13 @@ class ObjectNavDatasetTaskSampler(TaskSampler):
         self.env_args = env_args
         self.scenes = scenes
         self.episodes = {
-            scene: self._load_dataset(scene, scene_directory + "/episodes")
+            scene: ObjectNavDatasetTaskSampler.load_dataset(
+                scene, scene_directory + "/episodes"
+            )
             for scene in scenes
         }
-        get_logger().warning(
-            "Assuming the first entry in the cached list of dicts is the correct cache!!!"
-        )
         self.distance_caches = {
-            scene: self._load_distance_cache(
+            scene: ObjectNavDatasetTaskSampler.load_distance_cache(
                 scene, scene_directory + "/distance_caches"
             )
             for scene in scenes
@@ -338,9 +334,7 @@ class ObjectNavDatasetTaskSampler(TaskSampler):
         if loop_dataset:
             self.max_tasks = None
         else:
-            self.max_tasks = sum(
-                len(scene_episodes) for scene_episodes in self.episodes
-            )
+            self.max_tasks = sum(len(self.episodes[scene]) for scene in self.episodes)
         self.reset_tasks = self.max_tasks
         self.scene_index = 0
         self.episode_index = 0
@@ -359,7 +353,8 @@ class ObjectNavDatasetTaskSampler(TaskSampler):
         env = self.env_class(**self.env_args)
         return env
 
-    def _load_dataset(self, scene: str, base_directory: str) -> List[Dict]:
+    @staticmethod
+    def load_dataset(scene: str, base_directory: str) -> List[Dict]:
         filename = (
             "/".join([base_directory, scene])
             if base_directory[-1] != "/"
@@ -374,7 +369,8 @@ class ObjectNavDatasetTaskSampler(TaskSampler):
         random.shuffle(data)
         return data
 
-    def _load_distance_cache(self, scene: str, base_directory: str) -> Dict:
+    @staticmethod
+    def load_distance_cache(scene: str, base_directory: str) -> Dict:
         filename = (
             "/".join([base_directory, scene])
             if base_directory[-1] != "/"
@@ -461,12 +457,12 @@ class ObjectNavDatasetTaskSampler(TaskSampler):
         task_info["distance_to_target"] = episode["shortest_path_length"]
         task_info["path_to_target"] = episode["shortest_path"]
         task_info["object_type"] = episode["object_type"]
+        task_info["id"] = episode["id"]
         if self.allow_flipping and random.random() > 0.5:
             task_info["mirrored"] = True
         else:
             task_info["mirrored"] = False
-        if self.reset_tasks is not None:
-            get_logger().debug("valid task_info {}".format(task_info))
+
         self.episode_index += 1
         if self.max_tasks is not None:
             self.max_tasks -= 1
@@ -743,14 +739,13 @@ class PointNavDatasetTaskSampler(TaskSampler):
         self.scenes = scenes
         self.shuffle_dataset: bool = shuffle_dataset
         self.episodes = {
-            scene: self._load_dataset(scene, scene_directory + "/episodes")
+            scene: ObjectNavDatasetTaskSampler.load_dataset(
+                scene, scene_directory + "/episodes"
+            )
             for scene in scenes
         }
-        get_logger().warning(
-            "Assuming the first entry in the cached list of dicts is the correct cache!!!"
-        )
         self.distance_caches = {
-            scene: self._load_distance_cache(
+            scene: ObjectNavDatasetTaskSampler.load_distance_cache(
                 scene, scene_directory + "/distance_caches"
             )
             for scene in scenes
@@ -768,9 +763,7 @@ class PointNavDatasetTaskSampler(TaskSampler):
         if loop_dataset:
             self.max_tasks = None
         else:
-            self.max_tasks = sum(
-                len(scene_episodes) for scene_episodes in self.episodes
-            )
+            self.max_tasks = sum(len(self.episodes[scene]) for scene in self.episodes)
         self.reset_tasks = self.max_tasks
         self.scene_index = 0
         self.episode_index = 0
@@ -788,35 +781,6 @@ class PointNavDatasetTaskSampler(TaskSampler):
     def _create_environment(self) -> RoboThorEnvironment:
         env = self.env_class(**self.env_args)
         return env
-
-    def _load_dataset(self, scene: str, base_directory: str) -> List[Dict]:
-        filename = (
-            "/".join([base_directory, scene])
-            if base_directory[-1] != "/"
-            else "".join([base_directory, scene])
-        )
-        filename += ".json.gz"
-        fin = gzip.GzipFile(filename, "r")
-        json_bytes = fin.read()
-        fin.close()
-        json_str = json_bytes.decode("utf-8")
-        data = json.loads(json_str)
-        random.shuffle(data)
-        return data
-
-    def _load_distance_cache(self, scene: str, base_directory: str) -> Dict:
-        filename = (
-            "/".join([base_directory, scene])
-            if base_directory[-1] != "/"
-            else "".join([base_directory, scene])
-        )
-        filename += ".json.gz"
-        fin = gzip.GzipFile(filename, "r")
-        json_bytes = fin.read()
-        fin.close()
-        json_str = json_bytes.decode("utf-8")
-        data = json.loads(json_str)
-        return data
 
     @property
     def __len__(self) -> Union[int, float]:
@@ -876,22 +840,22 @@ class PointNavDatasetTaskSampler(TaskSampler):
 
         task_info = {
             "scene": scene,
-            "initial_position": ["initial_position"],
+            "initial_position": find_nearest_point_in_cache(
+                distance_cache, _str_to_pos(episode["initial_position"])
+            ),
             "initial_orientation": episode["initial_orientation"],
             "target": find_nearest_point_in_cache(
                 distance_cache, _str_to_pos(episode["target_position"])
             ),
             "shortest_path": episode["shortest_path"],
             "distance_to_target": episode["shortest_path_length"],
+            "id": episode["id"],
         }
 
         if self.allow_flipping and random.random() > 0.5:
             task_info["mirrored"] = True
         else:
             task_info["mirrored"] = False
-
-        if self.reset_tasks is not None:
-            get_logger().debug("valid task_info {}".format(task_info))
 
         self.episode_index += 1
         if self.max_tasks is not None:

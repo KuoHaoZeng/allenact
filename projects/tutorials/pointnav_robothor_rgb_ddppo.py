@@ -28,7 +28,7 @@ from plugins.robothor_plugin.robothor_tasks import PointNavTask
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
 
 
-class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
+class PointNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
     """A Point Navigation experiment configuration in RoboThor."""
 
     # Task Parameters
@@ -341,5 +341,4 @@ class ObjectNavRoboThorRGBPPOExperimentConfig(ExperimentConfig):
         res["loop_dataset"] = False
         res["env_args"] = {}
         res["env_args"].update(self.ENV_ARGS)
-        res["env_args"]["x_display"] = "10.0"
         return res

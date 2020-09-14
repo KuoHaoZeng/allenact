@@ -303,6 +303,23 @@ class NeverEarlyStoppingCriterion(EarlyStoppingCriterion):
 
 
 class OffPolicyPipelineComponent(NamedTuple):
+    """An off-policy component for a PipeLineStage.
+
+    # Attributes
+
+    data_iterator_builder: A function to instantiate a Data Iterator (with a __next__(self) method)
+    loss_names: list of unique names assigned to off-policy losses
+    updates: number of off-policy updates between on-policy rollout collections
+    loss_weights : A list of floating point numbers describing the relative weights
+        applied to the losses referenced by `loss_names`. Should be the same length
+        as `loss_names`. If this is `None`, all weights will be assumed to be one.
+    data_iterator_kwargs_generator: Optional generator of keyword arguments for data_iterator_builder (useful for
+        distributed training. It takes
+        a `cur_worker` int value,
+        a `rollouts_per_worker` list of number of samplers per training worker,
+        and an optional random `seed` shared by all workers, which can be None.
+    """
+
     data_iterator_builder: Callable[..., Iterator]
     loss_names: List[str]
     updates: int
@@ -361,6 +378,7 @@ class PipelineStage(object):
         self.offpolicy_epochs: Optional[int] = None
         self.offpolicy_named_losses: Optional[Dict[str, AbstractOffPolicyLoss]] = None
         self._offpolicy_named_loss_weights: Optional[Dict[str, float]] = None
+        self.offpolicy_steps_taken_in_stage: int = 0
 
     @property
     def is_complete(self):
@@ -487,6 +505,10 @@ class TrainingPipeline(object):
     def total_steps(self) -> int:
         return sum(ps.steps_taken_in_stage for ps in self.pipeline_stages)
 
+    @property
+    def total_offpolicy_steps(self) -> int:
+        return sum(ps.offpolicy_steps_taken_in_stage for ps in self.pipeline_stages)
+
     def _refresh_current_stage(
         self, force_stage_search_from_start: bool = False
     ) -> Optional[PipelineStage]:
@@ -539,6 +561,7 @@ class TrainingPipeline(object):
                 {
                     "early_stopping_criterion_met": ps.early_stopping_criterion_met,
                     "steps_taken_in_stage": ps.steps_taken_in_stage,
+                    "offpolicy_steps_taken_in_stage": ps.offpolicy_steps_taken_in_stage,
                 }
                 for ps in self.pipeline_stages
             ],
@@ -550,9 +573,12 @@ class TrainingPipeline(object):
         for ps, stage_info in zip(self.pipeline_stages, state_dict["stage_info_list"]):
             ps.early_stopping_criterion_met = stage_info["early_stopping_criterion_met"]
             ps.steps_taken_in_stage = stage_info["steps_taken_in_stage"]
+            ps.offpolicy_steps_taken_in_stage = stage_info.get(
+                "offpolicy_steps_taken_in_stage", 0
+            )
 
         self.rollout_count = state_dict["rollout_count"]
-        self.off_policy_epochs = state_dict["off_policy_epochs"]
+        self.off_policy_epochs = state_dict.get("off_policy_epochs", 0)
 
         self._refresh_current_stage(force_stage_search_from_start=True)
 
