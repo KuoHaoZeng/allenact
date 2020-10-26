@@ -51,7 +51,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
         update_repeats = 3
         num_steps = 30
         save_interval = 5000000
-        log_interval = 10#10000
+        log_interval = 10000
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95

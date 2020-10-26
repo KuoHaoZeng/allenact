@@ -124,7 +124,7 @@ class IThorEnvironment(object):
     @property
     def current_depth(self) -> np.ndarray:
         """Returns depth image corresponding to the agent's egocentric view."""
-        return self.controller.last_event.depth_frame
+        return np.expand_dims(self.controller.last_event.depth_frame, axis=2)
 
     @property
     def last_event(self) -> ai2thor.server.Event:

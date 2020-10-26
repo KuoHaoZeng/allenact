@@ -27,8 +27,6 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
     def __init__(self):
         super().__init__()
 
-        self.ENV_ARGS["renderDepthImage"] = True
-
         self.SENSORS = [
             RGBSensorThor(
                 height=self.SCREEN_SIZE,
@@ -59,13 +57,13 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(75000000)
+        ppo_steps = int(2000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
         num_steps = 30
-        save_interval = 5000000
-        log_interval = 10000
+        save_interval = 100000
+        log_interval = 10
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95
