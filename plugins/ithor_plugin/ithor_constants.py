@@ -10,6 +10,10 @@ ROTATE_RIGHT = "RotateRight"
 LOOK_DOWN = "LookDown"
 LOOK_UP = "LookUp"
 END = "End"
+DIRECTIONAL_AHEAD_PUSH = "DirectionalPush"
+DIRECTIONAL_BACK_PUSH = "DirectionalPush"
+DIRECTIONAL_RIGHT_PUSH = "DirectionalPush"
+DIRECTIONAL_LEFT_PUSH = "DirectionalPush"
 
 VISIBILITY_DISTANCE = 1.25
 FOV = 90.0

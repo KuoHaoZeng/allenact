@@ -9,9 +9,18 @@ import warnings
 from typing import Tuple, Dict, List, Set, Union, Any, Optional, Mapping
 
 import ai2thor.server
+import ai2thor.fifo_server
 import networkx as nx
 import numpy as np
 from ai2thor.controller import Controller
+from ai2thor.util import metrics
+
+from utils.cache_utils import (
+    DynamicDistanceCache,
+    pos_to_str_for_cache,
+    str_to_pos_for_cache,
+)
+from utils.system import get_logger
 
 from plugins.ithor_plugin.ithor_constants import VISIBILITY_DISTANCE, FOV
 from plugins.ithor_plugin.ithor_util import round_to_factor
@@ -100,6 +109,8 @@ class IThorEnvironment(object):
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
 
+        self.distance_cache = DynamicDistanceCache(rounding=1)
+
     @property
     def scene_name(self) -> str:
         """Current ai2thor scene."""
@@ -109,6 +120,11 @@ class IThorEnvironment(object):
     def current_frame(self) -> np.ndarray:
         """Returns rgb image corresponding to the agent's egocentric view."""
         return self.controller.last_event.frame
+
+    @property
+    def current_depth(self) -> np.ndarray:
+        """Returns depth image corresponding to the agent's egocentric view."""
+        return self.controller.last_event.depth_frame
 
     @property
     def last_event(self) -> ai2thor.server.Event:
@@ -188,6 +204,8 @@ class IThorEnvironment(object):
                 player_screen_height=self._start_player_screen_height,
                 local_executable_path=self._local_thor_build,
                 quality=self._quality,
+                fastActionEmit=True,
+                server_class=ai2thor.fifo_server.FifoServer,
             )
 
         self.controller = create_controller()
@@ -216,6 +234,22 @@ class IThorEnvironment(object):
         finally:
             self._started = False
 
+    def initialize(self, move_mag: float = 0.25, **kwargs) -> None:
+        self._move_mag = move_mag
+        self._grid_size = self._move_mag
+
+        self.controller.step(
+            {
+                "action": "Initialize",
+                "gridSize": self._grid_size,
+                "visibilityDistance": self._visibility_distance,
+                "fov": self._fov,
+                "makeAgentsVisible": self.make_agents_visible,
+                "alwaysReturnVisibleRange": self._always_return_visible_range,
+                **kwargs,
+            }
+        )
+
     def reset(
         self, scene_name: Optional[str], move_mag: float = 0.25, **kwargs,
     ):
@@ -237,17 +271,7 @@ class IThorEnvironment(object):
             scene_name = self.controller.last_event.metadata["sceneName"]
         self.controller.reset(scene_name)
 
-        self.controller.step(
-            {
-                "action": "Initialize",
-                "gridSize": self._grid_size,
-                "visibilityDistance": self._visibility_distance,
-                "fov": self._fov,
-                "makeAgentsVisible": self.make_agents_visible,
-                "alwaysReturnVisibleRange": self._always_return_visible_range,
-                **kwargs,
-            }
-        )
+        self.initialize(move_mag, **kwargs)
 
         if self.object_open_speed != 1.0:
             self.controller.step(
@@ -264,6 +288,97 @@ class IThorEnvironment(object):
                 )
             )
         self._initially_reachable_points = self.last_action_return
+
+    def path_from_point_to_point(
+        self, position: Dict[str, float], target: Dict[str, float]
+    ) -> Optional[List[Dict[str, float]]]:
+        try:
+            return self.controller.step(
+                action="GetShortestPathToPoint",
+                position=position,
+                x=target["x"],
+                y=target["y"],
+                z=target["z"],
+                # renderImage=False
+            ).metadata["actionReturn"]["corners"]
+        except:
+            get_logger().debug(
+                "Failed to find path for {} in {}. Start point {}, agent state {}.".format(
+                    target,
+                    self.controller.last_event.metadata["sceneName"],
+                    position,
+                    self.agent_state(),
+                )
+            )
+            return None
+
+    def distance_from_point_to_point(
+        self, position: Dict[str, float], target: Dict[str, float]
+    ) -> float:
+        path = self.path_from_point_to_point(position, target)
+        if path:
+            return metrics.path_distance(path)
+        return -1.0
+
+    def distance_to_point(self, target: Dict[str, float]) -> float:
+        """Minimal geodesic distance to end point from agent's current
+        location.
+
+        It might return -1.0 for unreachable targets.
+        """
+        return self.distance_cache.find_distance(
+            self.controller.last_event.metadata["agent"]["position"],
+            target,
+            self.distance_from_point_to_point,
+        )
+
+    def agent_state(self) -> Dict:
+        """Return agent position, rotation and horizon."""
+        agent_meta = self.last_event.metadata["agent"]
+        return {
+            **{k: float(v) for k, v in agent_meta["position"].items()},
+            "rotation": {k: float(v) for k, v in agent_meta["rotation"].items()},
+            "horizon": round(float(agent_meta["cameraHorizon"]), 1),
+        }
+
+    def teleport(
+        self, pose: Dict[str, float], rotation: Dict[str, float], horizon: float = 0.0
+    ):
+        e = self.controller.step(
+            action="TeleportFull",
+            x=pose["x"],
+            y=pose["y"],
+            z=pose["z"],
+            rotation=rotation,
+            horizon=horizon,
+        )
+        return e.metadata["lastActionSuccess"]
+
+    def spawn_obj(self, obj):
+        e = self.controller.step(
+            action="CreateObjectOnFloor",
+            objectType=obj["objectType"],
+            objectVariation=obj["objectVariation"],
+            x=obj["position"]["x"],
+            z=obj["position"]["z"],
+            rotation=obj["rotation"],
+            randomizeObjectAppearance=False
+        )
+        return e.metadata["lastActionSuccess"]
+
+    @property
+    def moveable_closest_obj(self):
+        objs = self.visible_objects()
+        objs = [ele for ele in objs if ele["moveable"] or ele["pickupable"]]
+        obj = None
+        if len(objs) > 0:
+            agent_pos = [self.last_event.metadata["agent"]["position"]["x"],
+                         self.last_event.metadata["agent"]["position"]["z"]]
+            dis = [(obj["position"]["x"] - agent_pos[0]) ** 2 +
+                   (obj["position"]["z"] - agent_pos[1]) ** 2 for obj in objs]
+            idx = np.argmin(dis)
+            obj = objs[idx]
+        return obj
 
     def teleport_agent_to(
         self,

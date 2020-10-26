@@ -189,6 +189,31 @@ class RoboThorEnvironment:
         )
         return e.metadata["lastActionSuccess"]
 
+    def spawn_obj(self, obj):
+        e = self.controller.step(
+            action="CreateObjectAtLocation",
+            objectType=obj["objectType"],
+            objectVariation=obj["objectVariation"],
+            position=obj["position"],
+            rotation=obj["rotation"],
+            randomizeObjectAppearance=False
+        )
+        return e.metadata["lastActionSuccess"]
+
+    @property
+    def moveable_closest_obj(self):
+        objs = self.visible_objects()
+        objs = [ele for ele in objs if ele["moveable"] or ele["pickupable"]]
+        obj = None
+        if len(objs) > 0:
+            agent_pos = [self.last_event["agent"]["position"]["x"],
+                         self.last_event["agent"]["position"]["z"]]
+            dis = [(obj["position"]["x"] - agent_pos[0]) ** 2 +
+                   (obj["position"]["z"] - agent_pos[1]) ** 2 for obj in objs]
+            idx = np.argmin(dis)
+            obj = objs[idx]
+        return obj
+
     def reset(
         self, scene_name: str = None, filtered_objects: Optional[List[str]] = None
     ) -> None:
