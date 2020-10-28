@@ -440,6 +440,7 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
         self.last_geodesic_distance = self.env.distance_to_point(
             self.task_info["target"]
         )
+        self.last_tget_in_path = False
 
         self.optimal_distance = self.last_geodesic_distance
         self._rewards: List[float] = []
@@ -546,11 +547,24 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
 
         return rew * self.reward_configs["shaping_weight"]
 
+    def shape_by_path(self) -> float:
+        reward = 0.0
+        if self.env.last_action in [DIRECTIONAL_AHEAD_PUSH, DIRECTIONAL_BACK_PUSH,
+                                    DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH]:
+            tget_in_path = self.env.target_in_reachable_points(self.task_info["target"])
+            if tget_in_path and not self.last_tget_in_path:
+                reward += 0.5
+            elif not tget_in_path and self.last_tget_in_path:
+                reward -= 0.5
+            self.last_tget_in_path = tget_in_path
+        return reward
+
     def judge(self) -> float:
         """Judge the last event."""
         reward = self.reward_configs["step_penalty"]
 
         reward += self.shaping()
+        reward += self.shape_by_path()
 
         if self._took_end_action:
             if self._success is not None:

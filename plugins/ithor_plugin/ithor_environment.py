@@ -367,6 +367,15 @@ class IThorEnvironment(object):
         )
         return e.metadata["lastActionSuccess"]
 
+    def target_in_reachable_points(self, tget) -> bool:
+        reachable_points = self.currently_reachable_points
+        reachable_points = np.array([[ele["x"], ele["z"]] for ele in reachable_points])
+        tget = np.array([tget["x"], tget["z"]])
+        if tget in reachable_points:
+            return True
+        else:
+            return False
+
     @property
     def moveable_closest_obj(self):
         objs = self.visible_objects()
