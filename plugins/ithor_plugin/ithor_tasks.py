@@ -418,7 +418,7 @@ class PointNavTask(Task[IThorEnvironment]):
         }
 
 class PointNavObstaclesTask(Task[IThorEnvironment]):
-    _actions = (MOVE_AHEAD, ROTATE_LEFT, ROTATE_RIGHT,
+    _actions = (MOVE_AHEAD, ROTATE_LEFT, ROTATE_RIGHT, LOOK_DOWN, LOOK_UP,
                 DIRECTIONAL_AHEAD_PUSH, DIRECTIONAL_BACK_PUSH, DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH,
                 END)
 
@@ -490,6 +490,9 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
                 self.last_action_success = self.env.last_action_success
             else:
                 self.last_action_success = False
+        elif action_str in [LOOK_UP, LOOK_DOWN]:
+            self.env.step({"action": action_str})
+            self.last_action_success = self.env.last_action_success
         else:
             self.env.step({"action": action_str})
             self.last_action_success = self.env.last_action_success
@@ -607,5 +610,5 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
             "total_reward": total_reward,
             "dist_to_target": dist2tget,
             "spl": spl,
-            "target_in_reachable_points": float(self.last_tget_in_path),
+            "target_in_reachable_points": self.last_tget_in_path,
         }
