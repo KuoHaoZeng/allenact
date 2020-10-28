@@ -696,10 +696,10 @@ class PointNavObstaclesDatasetTaskSampler(TaskSampler):
         scene = self.scenes[self.scene_index]
         episode = self.episodes[scene][self.episode_index]
         if self.env is not None:
-            #if scene.replace("_physics", "") != self.env.scene_name.replace(
-            #        "_physics", ""
-            #):
-            self.env.reset(scene_name=scene, filtered_objects=[])
+            if scene.replace("_physics", "") != self.env.scene_name.replace(
+                    "_physics", ""
+            ):
+                self.env.reset(scene_name=scene, filtered_objects=[])
         else:
             self.env = self._create_environment()
             self.env.reset(scene_name=scene, filtered_objects=[])

@@ -246,6 +246,7 @@ class IThorEnvironment(object):
                 "fov": self._fov,
                 "makeAgentsVisible": self.make_agents_visible,
                 "alwaysReturnVisibleRange": self._always_return_visible_range,
+                #"renderDepthImage": True,
                 **kwargs,
             }
         )

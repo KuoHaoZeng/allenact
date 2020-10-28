@@ -30,7 +30,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
         )
 
-        self.NUM_PROCESSES = 20
+        self.NUM_PROCESSES = 40
         self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
         #self.TRAIN_GPU_IDS = [0]
         self.VALID_GPU_IDS = [torch.cuda.device_count() - 1]
