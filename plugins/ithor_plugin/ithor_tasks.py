@@ -547,7 +547,7 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
 
         return rew * self.reward_configs["shaping_weight"]
 
-    def shape_by_path(self) -> float:
+    def shaping_by_path(self) -> float:
         reward = 0.0
         if self.env.last_action in [DIRECTIONAL_AHEAD_PUSH, DIRECTIONAL_BACK_PUSH,
                                     DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH]:
@@ -564,7 +564,7 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
         reward = self.reward_configs["step_penalty"]
 
         reward += self.shaping()
-        reward += self.shape_by_path()
+        reward += self.shaping_by_path()
 
         if self._took_end_action:
             if self._success is not None:
@@ -607,4 +607,5 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
             "total_reward": total_reward,
             "dist_to_target": dist2tget,
             "spl": spl,
+            "target_in_reachable_points": float(self.last_tget_in_path),
         }
