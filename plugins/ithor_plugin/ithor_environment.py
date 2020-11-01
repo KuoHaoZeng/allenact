@@ -390,6 +390,35 @@ class IThorEnvironment(object):
             obj = objs[idx]
         return obj
 
+    def moveable_closest_obj_by_types(self, objectTypes):
+        objs = self.visible_objects()
+        objs = [ele for ele in objs if ele["moveable"] or ele["pickupable"]]
+        objs = [ele for ele in objs if ele["objectType"] in objectTypes]
+        obj = None
+        if len(objs) > 0:
+            agent_pos = [self.last_event.metadata["agent"]["position"]["x"],
+                         self.last_event.metadata["agent"]["position"]["z"]]
+            dis = [(obj["position"]["x"] - agent_pos[0]) ** 2 +
+                   (obj["position"]["z"] - agent_pos[1]) ** 2 for obj in objs]
+            idx = np.argmin(dis)
+            obj = objs[idx]
+        return obj
+
+    def get_mask_by_object_type(self, objectType):
+        objs = self.visible_objects()
+        objsIds = [ele["objectId"] for ele in objs if ele["objectType"] == objectType]
+        mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[1]))
+        if len(objsIds) > 0:
+            for Id in objsIds:
+                mask = np.maximum(mask, self.last_event.instance_masks[Id])
+        return mask
+
+    def get_masks_by_object_types(self, objectTypes):
+        mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[0], len(objectTypes)))
+        for i, objType in enumerate(objectTypes):
+            mask[:, :, i] = self.get_mask_by_object_type(objType)
+        return mask
+
     def teleport_agent_to(
         self,
         x: float,

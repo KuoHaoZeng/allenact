@@ -463,7 +463,7 @@ class DepthSensor(VisionSensor[EnvType, SubTaskType], ABC):
         self, env: EnvType, task: Optional[SubTaskType], *args: Any, **kwargs: Any
     ) -> Any:
         depth = super().get_observation(env, task, *args, **kwargs)
-        depth = np.expand_dims(depth, 2)
+        #depth = np.expand_dims(depth, 2)
 
         return depth
 

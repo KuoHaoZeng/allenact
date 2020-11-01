@@ -5,30 +5,37 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from core.algorithms.onpolicy_sync.losses import PPO
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
+from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GPSCompassSensorIThor,
+    LocalKeyPoints3DSensorThor,
+    GlobalKeyPoints3DSensorThor,
 )
 from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesTask
 from projects.pointnav_baselines.experiments.ithor_obstacles.pointnav_ithor_base import (
     PointNaviThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
-    PointNavActorCriticSimpleConvRNN,
+    PointNavKeyPointsNPMActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
 
 
 class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
-    """An Point Navigation experiment configuration in iThor with Depth
+    """An Point Navigation experiment configuration in iThor with RGBD
     input."""
 
     def __init__(self):
         super().__init__()
 
-        self.ENV_ARGS["renderDepthImage"] = True
-
         self.SENSORS = [
+            RGBSensorThor(
+                height=self.SCREEN_SIZE,
+                width=self.SCREEN_SIZE,
+                use_resnet_normalization=True,
+                uuid="rgb",
+            ),
             DepthSensorIThor(
                 height=self.SCREEN_SIZE,
                 width=self.SCREEN_SIZE,
@@ -36,28 +43,43 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 uuid="depth",
             ),
             GPSCompassSensorIThor(),
+            LocalKeyPoints3DSensorThor(
+                objectTypes=self.OBSTACLES_TYPES,
+                height=self.SCREEN_SIZE,
+                width=self.SCREEN_SIZE,
+                uuid="3Dkeypoints_local"
+            ),
+            GlobalKeyPoints3DSensorThor(
+                objectTypes=self.OBSTACLES_TYPES,
+                height=self.SCREEN_SIZE,
+                width=self.SCREEN_SIZE,
+                uuid="3Dkeypoints_global"
+            ),
         ]
 
         self.PREPROCESSORS = []
 
         self.OBSERVATIONS = [
+            "rgb",
             "depth",
             "target_coordinates_ind",
+            "3Dkeypoints_local",
+            "3Dkeypoints_global"
         ]
 
     @classmethod
     def tag(cls):
-        return "Pointnav-Obstacles-iTHOR-Depth-SimpleConv-DDPPO"
+        return "Pointnav-iTHOR-RGBD-KeyPoints-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(75000000)
+        ppo_steps = int(2000000)
         lr = 3e-4
         num_mini_batch = 1
-        update_repeats = 4
-        num_steps = 128
-        save_interval = 5000000
-        log_interval = 10000
+        update_repeats = 3
+        num_steps = 30
+        save_interval = 100000
+        log_interval = 10
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95
@@ -85,13 +107,17 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return PointNavActorCriticSimpleConvRNN(
+        return PointNavKeyPointsNPMActorCriticSimpleConvRNN(
             action_space=gym.spaces.Discrete(len(PointNavObstaclesTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",
+            obstacle_keypoints_sensor_uuid="3Dkeypoints_local",
             hidden_size=512,
             embed_coordinates=False,
             coordinate_dims=2,
+            obstacle_type_embedding_dim=8,
+            obstacle_state_hidden_dim=16,
+            num_obstacle_types=20,
             num_rnn_layers=1,
             rnn_type="GRU",
         )

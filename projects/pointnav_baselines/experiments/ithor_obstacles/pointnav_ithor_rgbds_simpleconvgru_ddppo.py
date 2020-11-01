@@ -5,9 +5,11 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from core.algorithms.onpolicy_sync.losses import PPO
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
+from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GPSCompassSensorIThor,
+    ClassSegmentationSensorThor,
 )
 from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesTask
 from projects.pointnav_baselines.experiments.ithor_obstacles.pointnav_ithor_base import (
@@ -20,15 +22,19 @@ from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, Lin
 
 
 class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
-    """An Point Navigation experiment configuration in iThor with Depth
+    """An Point Navigation experiment configuration in iThor with RGBD
     input."""
 
     def __init__(self):
         super().__init__()
 
-        self.ENV_ARGS["renderDepthImage"] = True
-
         self.SENSORS = [
+            RGBSensorThor(
+                height=self.SCREEN_SIZE,
+                width=self.SCREEN_SIZE,
+                use_resnet_normalization=True,
+                uuid="rgb",
+            ),
             DepthSensorIThor(
                 height=self.SCREEN_SIZE,
                 width=self.SCREEN_SIZE,
@@ -36,28 +42,36 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 uuid="depth",
             ),
             GPSCompassSensorIThor(),
+            ClassSegmentationSensorThor(
+                objectTypes=self.OBSTACLES_TYPES,
+                height=self.SCREEN_SIZE,
+                width=self.SCREEN_SIZE,
+                uuid="class_seg"
+            ),
         ]
 
         self.PREPROCESSORS = []
 
         self.OBSERVATIONS = [
+            "rgb",
             "depth",
             "target_coordinates_ind",
+            "class_seg"
         ]
 
     @classmethod
     def tag(cls):
-        return "Pointnav-Obstacles-iTHOR-Depth-SimpleConv-DDPPO"
+        return "Pointnav-iTHOR-RGBDS-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(75000000)
+        ppo_steps = int(2000000)
         lr = 3e-4
         num_mini_batch = 1
-        update_repeats = 4
-        num_steps = 128
-        save_interval = 5000000
-        log_interval = 10000
+        update_repeats = 3
+        num_steps = 30
+        save_interval = 100000
+        log_interval = 10
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95

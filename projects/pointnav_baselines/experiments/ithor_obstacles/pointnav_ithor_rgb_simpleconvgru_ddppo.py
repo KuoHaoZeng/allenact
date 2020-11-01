@@ -27,7 +27,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 height=self.SCREEN_SIZE,
                 width=self.SCREEN_SIZE,
                 use_resnet_normalization=True,
-                uuid="rgb_lowres",
+                uuid="rgb",
             ),
             GPSCompassSensorIThor(),
         ]
@@ -35,7 +35,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
         self.PREPROCESSORS = []
 
         self.OBSERVATIONS = [
-            "rgb_lowres",
+            "rgb",
             "target_coordinates_ind",
         ]
 

@@ -3,12 +3,14 @@ from typing import Any, Dict, Optional, List, Tuple
 import gym
 import numpy as np
 import quaternion
+import torch
 
 from plugins.ithor_plugin.ithor_environment import IThorEnvironment
 from plugins.ithor_plugin.ithor_tasks import ObjectNavTask, PointNavTask
 from core.base_abstractions.sensor import Sensor, RGBSensor, DepthSensor
 from core.base_abstractions.task import Task
 from utils.misc_utils import prepare_locals_for_super
+from utils.utils_3d_torch import get_corners, local_project_2d_points_to_3d, project_2d_points_to_3d
 
 
 class RGBSensorThor(RGBSensor[IThorEnvironment, Task[IThorEnvironment]]):
@@ -177,3 +179,113 @@ class DepthSensorIThor(DepthSensor[IThorEnvironment, Task[IThorEnvironment]]):
 
     def frame_from_env(self, env: IThorEnvironment) -> np.ndarray:
         return env.current_depth.copy()
+
+
+class ClassSegmentationSensorThor(Sensor):
+    """Sensor for Class Segmentation in iTHOR.
+
+    Returns from a running IThorEnvironment instance, the current
+    class segmentation corresponding to the agent's egocentric view.
+    """
+    def __init__(self,
+                 objectTypes,
+                 height: Optional[int] = None,
+                 width: Optional[int] = None,
+                 uuid="class_segmentation"):
+        self.objectTypes = objectTypes
+        observation_space = gym.spaces.Box(
+            low=0,
+            high=1,
+            shape=(height, width, len(objectTypes)),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        return env.get_masks_by_object_types(self.objectTypes).copy()
+
+
+class LocalKeyPoints3DSensorThor(Sensor):
+    """Sensor for Key Points of objects in iTHOR.
+
+    Returns from a running IThorEnvironment instance, the current
+    key points of objects corresponding to the agent's egocentric view.
+    """
+    def __init__(self,
+                 objectTypes,
+                 height: Optional[int] = None,
+                 width: Optional[int] = None,
+                 uuid="class_segmentation"):
+        self.objectTypes = objectTypes
+        observation_space = gym.spaces.Box(
+            low=0,
+            high=max(height, width),
+            shape=(len(objectTypes), 8, 3),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        key_points = []
+        current_depth = env.current_depth
+        for objType in self.objectTypes:
+            mask = env.get_mask_by_object_type(objType)
+            points, depths = get_corners(mask, current_depth)
+            points = torch.Tensor([points])
+            depths = torch.Tensor([depths])
+            points_3d = local_project_2d_points_to_3d([env.last_event.metadata], points, depths)
+            key_points.append(points_3d.numpy()[0])
+        key_points = np.array(key_points)
+        return key_points
+
+
+class GlobalKeyPoints3DSensorThor(Sensor):
+    """Sensor for Key Points of objects in iTHOR.
+
+    Returns from a running IThorEnvironment instance, the current
+    key points of objects corresponding to the agent's egocentric view.
+    """
+    def __init__(self,
+                 objectTypes,
+                 height: Optional[int] = None,
+                 width: Optional[int] = None,
+                 uuid="class_segmentation"):
+        self.objectTypes = objectTypes
+        observation_space = gym.spaces.Box(
+            low=0,
+            high=max(height, width),
+            shape=(len(objectTypes), 8, 3),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        key_points = []
+        current_depth = env.current_depth
+        for objType in self.objectTypes:
+            mask = env.get_mask_by_object_type(objType)
+            points, depths = get_corners(mask, current_depth)
+            points = torch.Tensor([points])
+            depths = torch.Tensor([depths])
+            points_3d = project_2d_points_to_3d([env.last_event.metadata], points, depths)
+            key_points.append(points_3d.numpy()[0])
+        key_points = np.array(key_points)
+        return key_points

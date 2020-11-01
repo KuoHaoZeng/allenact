@@ -45,6 +45,9 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
 
         self.TARGET_TYPES = None
         self.SENSORS = None
+        self.OBSTACLES_TYPES = ["ArmChair", "DogBed", "Box", "Chair", "Desk", "DiningTable", "SideTable", "Sofa",
+                                "Stool", "Television", "Pillow", "Bread", "Apple", "AlarmClock", "Lettuce",
+                                "GarbageCan", "Laptop", "Microwave", "Pot", "Tomato"]
 
     def split_num_processes(self, ndevices):
         assert self.NUM_PROCESSES >= ndevices, "NUM_PROCESSES {} < ndevices {}".format(

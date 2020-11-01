@@ -481,7 +481,7 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
         elif action_str in [DIRECTIONAL_AHEAD_PUSH, DIRECTIONAL_BACK_PUSH,
                             DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH]:
             angle = [0.001, 180, 90, 270][action - 5]
-            obj = self.env.moveable_closest_obj
+            obj = self.env.moveable_closest_obj_by_types(self.task_info["obstacles_types"])
             if obj != None:
                 self.env.step({"action": action_str,
                                "objectId": obj["objectId"],

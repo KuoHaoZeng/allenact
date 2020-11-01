@@ -723,6 +723,7 @@ class PointNavObstaclesDatasetTaskSampler(TaskSampler):
             "distance_to_target": episode["shortest_path_length"],
             "id": episode["id"],
             "spawn_objects": episode["spawn_objects"],
+            "obstacles_types": episode["obstacles_types"],
         }
 
         if self.allow_flipping and random.random() > 0.5:
