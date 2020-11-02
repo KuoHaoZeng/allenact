@@ -383,7 +383,7 @@ class RolloutStorage(object):
             observations_batch = self.unflatten_observations(
                 self.observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
             )
-            next_observations_batch = self.unflatten_observations(
+            next_observations_batch = self.unflatten_next_observations(
                 self.next_observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
             )
 
@@ -436,6 +436,18 @@ class RolloutStorage(object):
         result: ObservationType = {}
         for name in flattened_batch:
             full_path = self.flattened_to_unflattened["observations"][name]
+            cur_dict = result
+            for part in full_path[:-1]:
+                if part not in cur_dict:
+                    cur_dict[part] = {}
+                cur_dict = cast(ObservationType, cur_dict[part])
+            cur_dict[full_path[-1]] = flattened_batch[name][0]
+        return result
+
+    def unflatten_next_observations(self, flattened_batch: Memory) -> ObservationType:
+        result: ObservationType = {}
+        for name in flattened_batch:
+            full_path = self.flattened_to_unflattened["next_observations"][name]
             cur_dict = result
             for part in full_path[:-1]:
                 if part not in cur_dict:
