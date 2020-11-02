@@ -53,6 +53,9 @@ class PPO(AbstractActorCriticLoss):
         actor_critic_output: ActorCriticOutput[CategoricalDistr],
     ) -> Dict[str, typing.Tuple[torch.Tensor, Optional[float]]]:
 
+        if isinstance(actor_critic_output, dict):
+            actor_critic_output = actor_critic_output["ac_output"]
+
         actions = typing.cast(torch.LongTensor, batch["actions"])
         values = actor_critic_output.values
         dist_entropy: torch.FloatTensor = actor_critic_output.distributions.entropy().unsqueeze(

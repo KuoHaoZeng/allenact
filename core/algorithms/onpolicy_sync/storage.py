@@ -30,10 +30,12 @@ class RolloutStorage(object):
         self.flattened_to_unflattened: Dict[str, Dict[str, List[str]]] = {
             "memory": dict(),
             "observations": dict(),
+            "next_observations": dict(),
         }
         self.unflattened_to_flattened: Dict[str, Dict[Tuple[str, ...], str]] = {
             "memory": dict(),
             "observations": dict(),
+            "next_observations": dict(),
         }
 
         self.dim_names = ["step", "sampler", "agent", None]
@@ -42,6 +44,7 @@ class RolloutStorage(object):
             actor_critic.recurrent_memory_specification, num_samplers
         )
         self.observations: Memory = Memory()
+        self.next_observations: Memory = Memory()
 
         self.num_agents = getattr(actor_critic, "num_agents", 1)
 
@@ -107,6 +110,7 @@ class RolloutStorage(object):
 
     def to(self, device: torch.device):
         self.observations.to(device)
+        self.next_observations.to(device)
         self.memory.to(device)
         self.rewards = self.rewards.to(device)
         self.value_preds = self.value_preds.to(device)
@@ -121,6 +125,13 @@ class RolloutStorage(object):
     ):
         self.insert_tensors(
             storage_name="observations", unflattened=observations, time_step=time_step
+        )
+
+    def insert_next_observations(
+            self, observations: ObservationType, time_step: int = 0,
+    ):
+        self.insert_tensors(
+            storage_name="next_observations", unflattened=observations, time_step=time_step
         )
 
     def insert_memory(
@@ -164,7 +175,7 @@ class RolloutStorage(object):
 
             flatten_name = prefix + name
             if flatten_name not in storage:
-                assert storage_name == "observations"
+                assert storage_name == "observations" or storage_name == "next_observations"
                 storage[flatten_name] = (
                     torch.zeros_like(current_data)  # type:ignore
                     .repeat(
@@ -191,7 +202,7 @@ class RolloutStorage(object):
                     tuple(path + [name])
                 ] = flatten_name
 
-            if storage_name == "observations":
+            if storage_name == "observations" or storage_name == "next_observations":
                 # current_data has a step dimension
                 assert time_step >= 0
                 storage[flatten_name][0][time_step : time_step + 1].copy_(current_data)
@@ -210,6 +221,7 @@ class RolloutStorage(object):
         masks: torch.Tensor,
     ):
         self.insert_observations(observations, time_step=self.step + 1)
+        self.insert_next_observations(observations, time_step=self.step)
         self.insert_memory(memory, time_step=self.step + 1)
 
         self.actions[self.step : self.step + 1].copy_(actions)  # type:ignore
@@ -229,6 +241,7 @@ class RolloutStorage(object):
             return  # we are keeping everything, no need to copy
 
         self.observations = self.observations.sampler_select(keep_list)
+        self.next_observations = self.next_observations.sampler_select(keep_list)
         self.memory = self.memory.sampler_select(keep_list)
         self.actions = self.actions[:, keep_list]
         self.prev_actions = self.prev_actions[:, keep_list]
@@ -313,7 +326,7 @@ class RolloutStorage(object):
         assert len(self.unnarrow_data) == 0
 
     def after_update(self):
-        for storage in [self.observations, self.memory]:
+        for storage in [self.observations, self.next_observations, self.memory]:
             for key in storage:
                 storage[key][0][0].copy_(storage[key][0][-1])
 
@@ -370,6 +383,9 @@ class RolloutStorage(object):
             observations_batch = self.unflatten_observations(
                 self.observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
             )
+            next_observations_batch = self.unflatten_observations(
+                self.next_observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
+            )
 
             actions_batch = []
             prev_actions_batch = []
@@ -404,6 +420,7 @@ class RolloutStorage(object):
 
             yield {
                 "observations": observations_batch,
+                "next_observations": next_observations_batch,
                 "memory": memory_batch,
                 "actions": actions_batch,
                 "prev_actions": prev_actions_batch,
@@ -429,6 +446,9 @@ class RolloutStorage(object):
 
     def pick_observation_step(self, step: int) -> ObservationType:
         return self.unflatten_observations(self.observations.step_select(step))
+
+    def pick_next_observation_step(self, step: int) -> ObservationType:
+        return self.unflatten_observations(self.next_observations.step_select(step))
 
     def pick_memory_step(self, step: int) -> Memory:
         return self.memory.step_squeeze(step)

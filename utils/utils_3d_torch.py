@@ -271,6 +271,24 @@ def get_gt_affine_matrix(metadatas_a, metadatas_b, ids):
     m[:, 2, 3] *= -1
     return m
 
+def get_gt_affine_matrix_by_pose(obj_a_pose, obj_b_pose):
+    # obj_a_pose: Bx6
+    # obj_b_pose: Bx6
+    # output: Bx4x4
+
+    m_a = get_affine_matrix(obj_a_pose)
+    m_a = torch.inverse(m_a)
+
+    m_b = get_affine_matrix(obj_b_pose)
+
+    m = torch.bmm(m_b, m_a)
+    m[:, 0, 2] *= -1
+    m[:, 1, 2] *= -1
+    m[:, 2, 0] *= -1
+    m[:, 2, 1] *= -1
+    m[:, 2, 3] *= -1
+    return m
+
 def draw_convex_hull_w_gt_affine_matrix_torch(event_a, event_b, id):
     from scipy.spatial import ConvexHull
 

@@ -219,13 +219,11 @@ class LocalKeyPoints3DSensorThor(Sensor):
     """
     def __init__(self,
                  objectTypes,
-                 height: Optional[int] = None,
-                 width: Optional[int] = None,
                  uuid="class_segmentation"):
         self.objectTypes = objectTypes
         observation_space = gym.spaces.Box(
-            low=0,
-            high=max(height, width),
+            low=-10,
+            high=10,
             shape=(len(objectTypes), 8, 3),
             dtype=np.float32,
         )
@@ -247,7 +245,7 @@ class LocalKeyPoints3DSensorThor(Sensor):
             depths = torch.Tensor([depths])
             points_3d = local_project_2d_points_to_3d([env.last_event.metadata], points, depths)
             key_points.append(points_3d.numpy()[0])
-        key_points = np.array(key_points)
+        key_points = np.array(key_points, dtype=np.float32)
         return key_points
 
 
@@ -259,13 +257,11 @@ class GlobalKeyPoints3DSensorThor(Sensor):
     """
     def __init__(self,
                  objectTypes,
-                 height: Optional[int] = None,
-                 width: Optional[int] = None,
                  uuid="class_segmentation"):
         self.objectTypes = objectTypes
         observation_space = gym.spaces.Box(
-            low=0,
-            high=max(height, width),
+            low=-10,
+            high=10,
             shape=(len(objectTypes), 8, 3),
             dtype=np.float32,
         )
@@ -287,5 +283,129 @@ class GlobalKeyPoints3DSensorThor(Sensor):
             depths = torch.Tensor([depths])
             points_3d = project_2d_points_to_3d([env.last_event.metadata], points, depths)
             key_points.append(points_3d.numpy()[0])
-        key_points = np.array(key_points)
+        key_points = np.array(key_points, dtype=np.float32)
         return key_points
+
+
+class GlobalObjPoseSensorThor(Sensor):
+    def __init__(self,
+                 objectTypes,
+                 uuid="object_pose"):
+        self.objectTypes = objectTypes
+        observation_space = gym.spaces.Box(
+            low=-360,
+            high=360,
+            shape=(len(objectTypes), 6),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        vis_objects = env.visible_objects()
+        vis_objects_type = [ele for ele in vis_objects if ele["objectType"] in self.objectTypes]
+        obj_pose = []
+        for objType in self.objectTypes:
+            if objType in vis_objects_type:
+                idx = vis_objects_type.index(objType)
+                pose = [vis_objects[idx]["position"]["x"],
+                        vis_objects[idx]["position"]["y"],
+                        vis_objects[idx]["position"]["z"],
+                        vis_objects[idx]["rotation"]["x"],
+                        vis_objects[idx]["rotation"]["y"],
+                        vis_objects[idx]["rotation"]["z"]]
+                obj_pose.append(pose)
+            else:
+                obj_pose.append([0, 0, 0, 0, 0, 0])
+        return np.array(obj_pose, dtype=np.float32)
+
+
+class GlobalObjUpdateMaskSensorThor(Sensor):
+    def __init__(self,
+                 objectTypes,
+                 uuid="object_update_mask"):
+        self.objectTypes = objectTypes
+        observation_space = gym.spaces.Box(
+            low=0,
+            high=1,
+            shape=(len(objectTypes), 1),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        vis_objects = env.visible_objects()
+        vis_objects_type = [ele["objectType"] for ele in vis_objects]
+        update_mask = []
+        for objType in self.objectTypes:
+            if objType in vis_objects_type:
+                update_mask.append(1)
+            else:
+                update_mask.append(0)
+        return np.array(update_mask, dtype=np.float32)
+
+
+class GlobalObjActionMaskSensorThor(Sensor):
+    def __init__(self,
+                 objectTypes,
+                 uuid="object_action_mask"):
+        self.objectTypes = objectTypes
+        observation_space = gym.spaces.Box(
+            low=0,
+            high=1,
+            shape=(len(objectTypes), 1),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        obj = env.moveable_closest_obj_by_types(self.objectTypes)
+        update_mask = [0] * len(self.objectTypes)
+        if not isinstance(obj, type(None)):
+            idx = self.objectTypes.index(obj["objectType"])
+            update_mask[idx] = 1
+        return np.array(update_mask, dtype=np.float32)
+
+
+class GlobalAgentPoseSensorThor(Sensor):
+    def __init__(self,
+                 uuid="agent_pose"):
+        observation_space = gym.spaces.Box(
+            low=-360,
+            high=360,
+            shape=(6,),
+            dtype=np.float32,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        agent_pose = [env.last_event.metadata["cameraPosition"]["x"],
+                      env.last_event.metadata["cameraPosition"]["y"],
+                      env.last_event.metadata["cameraPosition"]["z"],
+                      env.last_event.metadata["agent"]["cameraHorizon"],
+                      env.last_event.metadata["agent"]["rotation"]["y"],
+                      0]
+        return np.array(agent_pose, dtype=np.float32)

@@ -306,7 +306,7 @@ class PointNavKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[CategoricalD
 
         keypoints = keypoints.view(nb, ng, no, 1, np, nd).repeat(1, 1, 1, na, 1, 1)
         keypoints_homo = torch.cat((keypoints, torch.ones(nb, ng, no, na, np, 1).to(target_encoding.device)), 5)
-        obstacles_meta_hidden = obstacles_meta_hidden.view(nb, ng, no, 1, nh).repeat(1, 1, 1, na, 1)
+        obstacles_meta_hidden = obstacles_meta_hidden.view(1, 1, no, 1, nh).repeat(nb, ng, 1, na, 1)
         obstacles_rot_hidden = obstacles_rot_hidden.view(nb, ng, no, 1, nh).repeat(1, 1, 1, na, 1)
         obstacles_state_hidden = obstacles_state_hidden.view(nb, ng, no, 1, nh).repeat(1, 1, 1, na, 1)
         a_feature = a_feature.view(1, 1, 1, na, nh).repeat(nb, ng, no, 1, 1)
@@ -336,7 +336,9 @@ class PointNavKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[CategoricalD
         )
 
         if not isinstance(current_actions, type(None)):
-            NPM_out = new_keypoints.transpose(1, 2)[torch.arange(nb), current_actions.squeeze()].reshape(nb, no, -1)
+            new_keypoints = new_keypoints.view(nb * ng, no, na, 8, 3).transpose(1, 2)
+            current_actions = current_actions.view(nb * ng, 1, 1).squeeze()
+            NPM_out = new_keypoints[torch.arange(nb * ng), current_actions].reshape(nb, ng, no, 8, 3)
             out = {"ac_output": out, "npm_output": NPM_out}
 
         return out, memory.set_tensor("rnn", rnn_hidden_states)

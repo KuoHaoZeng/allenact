@@ -786,6 +786,7 @@ class OnPolicyTrainer(OnPolicyRLEngine):
                     memory=batch["memory"],
                     prev_actions=batch["prev_actions"],
                     masks=batch["masks"],
+                    current_actions=batch["actions"],
                 )
 
                 info: Dict[str, float] = {

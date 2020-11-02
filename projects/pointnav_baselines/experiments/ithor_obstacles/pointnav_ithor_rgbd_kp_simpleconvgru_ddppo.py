@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO
+from core.algorithms.onpolicy_sync.losses import PPO, NPM_Reg
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
@@ -11,6 +11,10 @@ from plugins.ithor_plugin.ithor_sensors import (
     GPSCompassSensorIThor,
     LocalKeyPoints3DSensorThor,
     GlobalKeyPoints3DSensorThor,
+    GlobalObjPoseSensorThor,
+    GlobalAgentPoseSensorThor,
+    GlobalObjUpdateMaskSensorThor,
+    GlobalObjActionMaskSensorThor,
 )
 from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesTask
 from projects.pointnav_baselines.experiments.ithor_obstacles.pointnav_ithor_base import (
@@ -45,16 +49,27 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             GPSCompassSensorIThor(),
             LocalKeyPoints3DSensorThor(
                 objectTypes=self.OBSTACLES_TYPES,
-                height=self.SCREEN_SIZE,
-                width=self.SCREEN_SIZE,
                 uuid="3Dkeypoints_local"
             ),
             GlobalKeyPoints3DSensorThor(
                 objectTypes=self.OBSTACLES_TYPES,
-                height=self.SCREEN_SIZE,
-                width=self.SCREEN_SIZE,
                 uuid="3Dkeypoints_global"
             ),
+            GlobalObjPoseSensorThor(
+                objectTypes=self.OBSTACLES_TYPES,
+                uuid="object_pose_global"
+            ),
+            GlobalAgentPoseSensorThor(
+                uuid="agent_pose_global"
+            ),
+            GlobalObjUpdateMaskSensorThor(
+                objectTypes=self.OBSTACLES_TYPES,
+                uuid="object_update_mask"
+            ),
+            GlobalObjActionMaskSensorThor(
+                objectTypes=self.OBSTACLES_TYPES,
+                uuid="object_action_mask"
+            )
         ]
 
         self.PREPROCESSORS = []
@@ -64,7 +79,11 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             "depth",
             "target_coordinates_ind",
             "3Dkeypoints_local",
-            "3Dkeypoints_global"
+            "3Dkeypoints_global",
+            "object_pose_global",
+            "agent_pose_global",
+            "object_update_mask",
+            "object_action_mask",
         ]
 
     @classmethod
@@ -92,13 +111,21 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             update_repeats=update_repeats,
             max_grad_norm=max_grad_norm,
             num_steps=num_steps,
-            named_losses={"ppo_loss": PPO(**PPOConfig)},
+            named_losses={
+                "ppo_loss": PPO(**PPOConfig),
+                "npm_loss": NPM_Reg(agent_pose_uuid="agent_pose_global",
+                                    pose_uuid="object_pose_global",
+                                    local_keypoints_uuid="3Dkeypoints_local",
+                                    global_keypoints_uuid="3Dkeypoints_global",
+                                    obj_update_mask_uuid="object_update_mask",
+                                    obj_action_mask_uuid="object_action_mask",)
+            },
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "npm_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
