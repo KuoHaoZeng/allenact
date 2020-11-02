@@ -383,9 +383,12 @@ class RolloutStorage(object):
             observations_batch = self.unflatten_observations(
                 self.observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
             )
-            next_observations_batch = self.unflatten_next_observations(
-                self.next_observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
+            next_observations_batch = self.unflatten_observations(
+                self.observations.slice(dim=0, start=1).sampler_select(cur_samplers)
             )
+            #next_observations_batch = self.unflatten_next_observations(
+            #    self.next_observations.slice(dim=0, stop=-1).sampler_select(cur_samplers)
+            #)
 
             actions_batch = []
             prev_actions_batch = []
