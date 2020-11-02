@@ -410,7 +410,8 @@ class IThorEnvironment(object):
         mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[1]))
         if len(objsIds) > 0:
             for Id in objsIds:
-                mask = np.maximum(mask, self.last_event.instance_masks[Id])
+                if Id in self.last_event.instance_masks.keys():
+                    mask = np.maximum(mask, self.last_event.instance_masks[Id])
         return mask
 
     def get_masks_by_object_types(self, objectTypes):
