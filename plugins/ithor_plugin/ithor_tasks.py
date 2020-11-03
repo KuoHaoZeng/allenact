@@ -486,7 +486,8 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
                 self.env.step({"action": action_str,
                                "objectId": obj["objectId"],
                                "moveMagnitude": obj["mass"] * 100,
-                               "pushAngle": angle})
+                               "pushAngle": angle,
+                               "autoSimulation": False})
                 self.last_action_success = self.env.last_action_success
             else:
                 self.last_action_success = False
