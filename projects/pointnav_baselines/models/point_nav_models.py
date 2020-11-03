@@ -108,6 +108,7 @@ class PointNavActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         memory: Memory,
         prev_actions: torch.Tensor,
         masks: torch.FloatTensor,
+        current_actions: torch.FloatTensor = None,
     ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
         target_encoding = self.get_target_coordinates_encoding(observations)
         x: Union[torch.Tensor, List[torch.Tensor]]
