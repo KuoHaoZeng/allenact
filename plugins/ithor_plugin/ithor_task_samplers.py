@@ -744,7 +744,7 @@ class PointNavObstaclesDatasetTaskSampler(TaskSampler):
             if not self.env.spawn_obj(obj):
                 return self.next_task()
 
-        self.env.initialize(0.25, fastActionEmit=True, renderObjectImage=True, renderDepthImage=True)
+        self.env.initialize(1.25, renderObjectImage=True, renderDepthImage=True)
 
         self._last_sampled_task = PointNavObstaclesTask(
             env=self.env,
