@@ -61,7 +61,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
-        num_steps = 30
+        num_steps = 300
         save_interval = 100000
         log_interval = 10
         gamma = 0.99
