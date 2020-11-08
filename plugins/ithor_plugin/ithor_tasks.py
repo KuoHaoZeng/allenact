@@ -25,6 +25,10 @@ from core.base_abstractions.sensor import Sensor
 from core.base_abstractions.task import Task
 from utils.system import get_logger
 
+from PIL import Image
+import os
+from utils.utils_3d_torch import project_3d_points_to_2d, draw_point
+import torch
 
 class ObjectNavTask(Task[IThorEnvironment]):
     """Defines the object navigation task in AI2-THOR.
@@ -469,6 +473,7 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
         self.env.stop()
 
     def _step(self, action: Union[int, Sequence[int]]) -> RLStepResult:
+
         assert isinstance(action, int)
         action = cast(int, action)
 
@@ -508,6 +513,29 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
             done=self.is_done(),
             info={"last_action_success": self.last_action_success, "action": action},
         )
+
+        if False:
+            tgts = []
+            for i in range(10):
+                tgt = [self.task_info["target"]["x"], i * 0.1, self.task_info["target"]["z"]]
+                tgts.append(tgt)
+            tgts = torch.Tensor(tgts).unsqueeze(0)
+            tgts_2d = project_3d_points_to_2d([self.env.last_event.metadata], tgts)
+            tgts_2d = tgts_2d.squeeze(0).numpy()
+            tgts_2d = np.array([[y, x] for (x, y) in tgts_2d])
+
+            self.env.counter += 1
+            #method_name = "rgbd_kp_1xNPM"
+            method_name = "rgbd"
+            folder = "qualitative_results/{}/{}/{}".format(method_name,
+                                                           self.task_info["scene"],
+                                                           self.task_info["id"])
+            if not os.path.isdir("{}".format(folder)):
+                os.makedirs("{}".format(folder))
+            img = Image.fromarray(self.env.current_frame, "RGB")
+            img = draw_point(img, tgts_2d)
+            img.save("{}/{:05}.png".format(folder, self.env.counter))
+
         return step_result
 
     def render(self, mode: str = "rgb", *args, **kwargs) -> np.ndarray:

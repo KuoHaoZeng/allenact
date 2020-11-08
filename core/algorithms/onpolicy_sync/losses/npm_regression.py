@@ -103,9 +103,9 @@ class NPM_Reg(AbstractActorCriticLoss):
             else:
                 loss += ((l.sum() / max(1, update_mask[b_idx].sum())) * masks[b_idx])
         loss /= (nb * ng)
-        loss *= 3
+        #loss *= 3
 
         return (
             loss,
-            {"npm_regression": loss.item() / 3,},
+            {"npm_regression": loss.item(),},
         )

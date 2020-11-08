@@ -43,6 +43,41 @@ def get_object_rotation_matrix(rot):
     return r.to(rot.device)
 
 def get_object_rotation_matrix_batch(rot):
+    #######
+    # Construct the Left-hand coordinate system rotation matrix. Ref: ???
+    #######
+
+    z = torch.zeros(len(rot)).to(rot.device).unsqueeze(1)
+    o = torch.ones(len(rot)).to(rot.device).unsqueeze(1)
+
+    # r_y
+    c = torch.cos(torch.deg2rad(rot[:, 1])).unsqueeze(1)
+    s = torch.sin(torch.deg2rad(rot[:, 1])).unsqueeze(1)
+    r_y_0 = torch.cat([c, z, s], dim=1).unsqueeze(1)
+    r_y_1 = torch.cat([z, o, z], dim=1).unsqueeze(1)
+    r_y_2 = torch.cat([-s, z, c], dim=1).unsqueeze(1)
+    r_y = torch.cat([r_y_0, r_y_1, r_y_2], dim=1)
+
+    # r_x
+    c = torch.cos(torch.deg2rad(rot[:, 0])).unsqueeze(1)
+    s = torch.sin(torch.deg2rad(rot[:, 0])).unsqueeze(1)
+    r_x_0 = torch.cat([o, z, z], dim=1).unsqueeze(1)
+    r_x_1 = torch.cat([z, c, -s], dim=1).unsqueeze(1)
+    r_x_2 = torch.cat([z, s, c], dim=1).unsqueeze(1)
+    r_x = torch.cat([r_x_0, r_x_1, r_x_2], dim=1)
+
+    # r_z
+    c = torch.cos(torch.deg2rad(rot[:, 2])).unsqueeze(1)
+    s = torch.sin(torch.deg2rad(rot[:, 2])).unsqueeze(1)
+    r_z_0 = torch.cat([c, -s, z], dim=1).unsqueeze(1)
+    r_z_1 = torch.cat([s, c, z], dim=1).unsqueeze(1)
+    r_z_2 = torch.cat([z, z, o], dim=1).unsqueeze(1)
+    r_z = torch.cat([r_z_0, r_z_1, r_z_2], dim=1)
+
+    r = torch.bmm(torch.bmm(r_y, r_x), r_z)
+    return r.to(rot.device)
+
+def get_object_rotation_matrix_batch_loop(rot):
     # agent_rot: Bx3
     # output: Bx3x3
 
@@ -339,7 +374,7 @@ def draw_point(img, points):
     for p in points:
         shape = [(p[1] - 1, p[0] - 1),
                  (p[1] + 1, p[0] + 1)]
-        draw.ellipse(shape, fill=(255, 255, 255))
+        draw.ellipse(shape, fill=(255, 255, 0))
     return img
 
 def get_corners(mask, depth_mask):

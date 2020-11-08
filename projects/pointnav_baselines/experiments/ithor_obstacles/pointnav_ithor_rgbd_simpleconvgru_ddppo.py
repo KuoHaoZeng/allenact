@@ -57,7 +57,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(2000000)
+        ppo_steps = int(20000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3

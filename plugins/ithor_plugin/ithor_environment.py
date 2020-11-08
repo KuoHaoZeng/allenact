@@ -111,6 +111,8 @@ class IThorEnvironment(object):
 
         self.distance_cache = DynamicDistanceCache(rounding=1)
 
+        self.counter = 0
+
     @property
     def scene_name(self) -> str:
         """Current ai2thor scene."""
@@ -246,7 +248,7 @@ class IThorEnvironment(object):
                 "fov": self._fov,
                 "makeAgentsVisible": self.make_agents_visible,
                 "alwaysReturnVisibleRange": self._always_return_visible_range,
-                #"fastActionEmit": True,
+                "fastActionEmit": True,
                 #"renderDepthImage": True,
                 **kwargs,
             }
@@ -290,6 +292,8 @@ class IThorEnvironment(object):
                 )
             )
         self._initially_reachable_points = self.last_action_return
+
+        self.counter = 0
 
     def path_from_point_to_point(
         self, position: Dict[str, float], target: Dict[str, float]

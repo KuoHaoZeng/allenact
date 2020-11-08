@@ -27,20 +27,20 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
         self.ENV_ARGS = dict(
             player_screen_width=self.SCREEN_SIZE,
             player_screen_height=self.SCREEN_SIZE,
-            local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
+            #local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
         )
 
-        self.NUM_PROCESSES = 1
+        self.NUM_PROCESSES = 32
         #self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
         self.TRAIN_GPU_IDS = [0]
         self.VALID_GPU_IDS = [torch.cuda.device_count() - 1]
         self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
 
         self.TRAIN_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles/train"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles-vis/train"
         )
         self.VAL_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles/val"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles-vis/val"
         )
 
         self.TARGET_TYPES = None
