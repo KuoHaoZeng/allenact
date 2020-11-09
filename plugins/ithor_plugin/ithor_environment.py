@@ -206,7 +206,7 @@ class IThorEnvironment(object):
                 player_screen_height=self._start_player_screen_height,
                 local_executable_path=self._local_thor_build,
                 quality=self._quality,
-                fastActionEmit=True,
+                #fastActionEmit=True,
                 server_class=ai2thor.fifo_server.FifoServer,
             )
 
@@ -248,7 +248,7 @@ class IThorEnvironment(object):
                 "fov": self._fov,
                 "makeAgentsVisible": self.make_agents_visible,
                 "alwaysReturnVisibleRange": self._always_return_visible_range,
-                "fastActionEmit": True,
+                #"fastActionEmit": True,
                 #"renderDepthImage": True,
                 **kwargs,
             }

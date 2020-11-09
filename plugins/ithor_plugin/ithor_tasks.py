@@ -641,3 +641,11 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
             "spl": spl,
             "target_in_reachable_points": self.last_tget_in_path,
         }
+
+    def query_expert(self, end_action_only: bool = False, **kwargs) -> Tuple[int, bool]:
+        if self._is_goal_in_range():
+            return self.class_action_names().index(END), True
+        if end_action_only:
+            return 0, False
+        else:
+            raise NotImplementedError

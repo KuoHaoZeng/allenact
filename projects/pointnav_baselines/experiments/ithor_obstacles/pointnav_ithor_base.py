@@ -31,8 +31,8 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
         )
 
         self.NUM_PROCESSES = 32
-        #self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
-        self.TRAIN_GPU_IDS = [0]
+        self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
+        #self.TRAIN_GPU_IDS = [0]
         self.VALID_GPU_IDS = [torch.cuda.device_count() - 1]
         self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
 
