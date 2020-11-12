@@ -6,6 +6,7 @@ import math
 import random
 import typing
 import warnings
+import os
 from typing import Tuple, Dict, List, Set, Union, Any, Optional, Mapping
 
 import ai2thor.server
@@ -24,6 +25,9 @@ from utils.system import get_logger
 
 from plugins.ithor_plugin.ithor_constants import VISIBILITY_DISTANCE, FOV
 from plugins.ithor_plugin.ithor_util import round_to_factor
+
+import torch
+from train_mask_rcnn import get_model_instance_segmentation
 
 
 class IThorEnvironment(object):
@@ -52,6 +56,7 @@ class IThorEnvironment(object):
         make_agents_visible: bool = True,
         object_open_speed: float = 1.0,
         simplify_physics: bool = False,
+        mask_rcnn_dir: str = "",
     ) -> None:
         """Initializer.
 
@@ -112,6 +117,17 @@ class IThorEnvironment(object):
         self.distance_cache = DynamicDistanceCache(rounding=1)
 
         self.counter = 0
+        if os.path.isfile(mask_rcnn_dir):
+            gpu_id = int(x_display.split(".")[-1])
+            loc = 'cuda:{}'.format(gpu_id)
+            checkpoint = torch.load(mask_rcnn_dir, map_location=loc)
+            self.mask_rcnn_model = get_model_instance_segmentation(21).cuda(gpu_id)
+            self.mask_rcnn_model.load_state_dict(checkpoint["model"])
+            self.mask_rcnn_model.eval()
+            self.mask_rcnn_gpu_id = gpu_id
+        else:
+            self.mask_rcnn_model = None
+
 
     @property
     def scene_name(self) -> str:
@@ -127,6 +143,11 @@ class IThorEnvironment(object):
     def current_depth(self) -> np.ndarray:
         """Returns depth image corresponding to the agent's egocentric view."""
         return np.expand_dims(self.controller.last_event.depth_frame, axis=2)
+
+    @property
+    def current_instance_segmentation_frame(self) -> np.ndarray:
+        """Returns instance segmentation frame corresponding to the agent's egocentric view."""
+        return self.controller.last_event.instance_segmentation_frame
 
     @property
     def last_event(self) -> ai2thor.server.Event:
@@ -395,6 +416,11 @@ class IThorEnvironment(object):
             obj = objs[idx]
         return obj
 
+    def get_objects_by_type(self, objectTypes):
+        objs = self.all_objects()
+        objs = [ele for ele in objs if ele["objectType"] in objectTypes]
+        return objs
+
     def moveable_closest_obj_by_types(self, objectTypes):
         objs = self.visible_objects()
         objs = [ele for ele in objs if ele["moveable"] or ele["pickupable"]]
@@ -410,14 +436,20 @@ class IThorEnvironment(object):
         return obj
 
     def get_mask_by_object_type(self, objectType):
+        mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[1]))
         objs = self.visible_objects()
         objsIds = [ele["objectId"] for ele in objs if ele["objectType"] == objectType]
-        mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[1]))
         if len(objsIds) > 0:
             for Id in objsIds:
                 if Id in self.last_event.instance_masks.keys():
                     mask = np.maximum(mask, self.last_event.instance_masks[Id])
         return mask
+
+    def get_mask_rcnn_result(self):
+        img = np.array(self.current_frame).astype(np.float)
+        img = np.transpose(img, (2, 0, 1)) / 255.
+        img = torch.Tensor(img).to(self.mask_rcnn_gpu_id)
+        return self.mask_rcnn_model([img])[0]
 
     def get_masks_by_object_types(self, objectTypes):
         mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[0], len(objectTypes)))

@@ -221,6 +221,7 @@ class LocalKeyPoints3DSensorThor(Sensor):
                  objectTypes,
                  uuid="class_segmentation"):
         self.objectTypes = objectTypes
+        self.sorted_objectTypes = sorted(list(objectTypes))
         observation_space = gym.spaces.Box(
             low=-10,
             high=10,
@@ -238,13 +239,31 @@ class LocalKeyPoints3DSensorThor(Sensor):
     ) -> Any:
         key_points = []
         current_depth = env.current_depth
-        for objType in self.objectTypes:
-            mask = env.get_mask_by_object_type(objType)
-            points, depths = get_corners(mask, current_depth)
-            points = torch.Tensor([points])
-            depths = torch.Tensor([depths])
-            points_3d = local_project_2d_points_to_3d([env.last_event.metadata], points, depths)
-            key_points.append(points_3d.numpy()[0])
+        if isinstance(env.mask_rcnn_model, type(None)):
+            for objType in self.objectTypes:
+                mask = env.get_mask_by_object_type(objType)
+                points, depths = get_corners(mask, current_depth)
+                points = torch.Tensor([points])
+                depths = torch.Tensor([depths])
+                points_3d = local_project_2d_points_to_3d([env.last_event.metadata], points, depths)
+                key_points.append(points_3d.numpy()[0])
+        else:
+            output = env.get_mask_rcnn_result()
+            labels = list(output["labels"].detach().cpu().numpy())
+            masks = output["masks"].squeeze(1).detach().cpu().numpy()
+            for objType in self.objectTypes:
+                mask_rcnn_label = self.sorted_objectTypes.index(objType)
+                if mask_rcnn_label in labels:
+                    idx = labels.index(mask_rcnn_label)
+                    mask = masks[idx]
+                else:
+                    mask = np.zeros((env.current_frame.shape[0], env.current_frame.shape[1]))
+                points, depths = get_corners(mask, current_depth)
+                points = torch.Tensor([points])
+                depths = torch.Tensor([depths])
+                points_3d = local_project_2d_points_to_3d([env.last_event.metadata], points, depths)
+                key_points.append(points_3d.numpy()[0])
+
         key_points = np.array(key_points, dtype=np.float32)
         return key_points
 
@@ -259,6 +278,7 @@ class GlobalKeyPoints3DSensorThor(Sensor):
                  objectTypes,
                  uuid="class_segmentation"):
         self.objectTypes = objectTypes
+        self.sorted_objectTypes = sorted(list(objectTypes))
         observation_space = gym.spaces.Box(
             low=-10,
             high=10,
@@ -276,13 +296,30 @@ class GlobalKeyPoints3DSensorThor(Sensor):
     ) -> Any:
         key_points = []
         current_depth = env.current_depth
-        for objType in self.objectTypes:
-            mask = env.get_mask_by_object_type(objType)
-            points, depths = get_corners(mask, current_depth)
-            points = torch.Tensor([points])
-            depths = torch.Tensor([depths])
-            points_3d = project_2d_points_to_3d([env.last_event.metadata], points, depths)
-            key_points.append(points_3d.numpy()[0])
+        if isinstance(env.mask_rcnn_model, type(None)):
+            for objType in self.objectTypes:
+                mask = env.get_mask_by_object_type(objType)
+                points, depths = get_corners(mask, current_depth)
+                points = torch.Tensor([points])
+                depths = torch.Tensor([depths])
+                points_3d = project_2d_points_to_3d([env.last_event.metadata], points, depths)
+                key_points.append(points_3d.numpy()[0])
+        else:
+            output = env.get_mask_rcnn_result()
+            labels = list(output["labels"].detach().cpu().numpy())
+            masks = output["masks"].squeeze(1).detach().cpu().numpy()
+            for objType in self.objectTypes:
+                mask_rcnn_label = self.sorted_objectTypes.index(objType)
+                if mask_rcnn_label in labels:
+                    idx = labels.index(mask_rcnn_label)
+                    mask = masks[idx]
+                else:
+                    mask = np.zeros((env.current_frame.shape[0], env.current_frame.shape[1]))
+                points, depths = get_corners(mask, current_depth)
+                points = torch.Tensor([points])
+                depths = torch.Tensor([depths])
+                points_3d = project_2d_points_to_3d([env.last_event.metadata], points, depths)
+                key_points.append(points_3d.numpy()[0])
         key_points = np.array(key_points, dtype=np.float32)
         return key_points
 

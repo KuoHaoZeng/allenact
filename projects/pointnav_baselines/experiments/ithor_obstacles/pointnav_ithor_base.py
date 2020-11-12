@@ -27,6 +27,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
         self.ENV_ARGS = dict(
             player_screen_width=self.SCREEN_SIZE,
             player_screen_height=self.SCREEN_SIZE,
+            mask_rcnn_dir="storage/maskRcnn/model_9.pth"
             #local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
         )
 
@@ -77,7 +78,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             nprocesses = 1
             gpu_ids = [] if not torch.cuda.is_available() else self.VALID_GPU_IDS
         elif mode == "test":
-            nprocesses = 15
+            nprocesses = 5
             gpu_ids = [] if not torch.cuda.is_available() else self.TEST_GPU_IDS
         else:
             raise NotImplementedError("mode must be 'train', 'valid', or 'test'.")
