@@ -96,7 +96,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss", "npm_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
