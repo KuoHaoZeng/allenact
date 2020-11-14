@@ -228,7 +228,7 @@ class IThorEnvironment(object):
                 local_executable_path=self._local_thor_build,
                 quality=self._quality,
                 #fastActionEmit=True,
-                #server_class=ai2thor.fifo_server.FifoServer,
+                server_class=ai2thor.fifo_server.FifoServer,
             )
 
         self.controller = create_controller()
