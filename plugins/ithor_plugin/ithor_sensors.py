@@ -345,7 +345,7 @@ class GlobalObjPoseSensorThor(Sensor):
             **kwargs: Any
     ) -> Any:
         vis_objects = env.visible_objects()
-        vis_objects_type = [ele for ele in vis_objects if ele["objectType"] in self.objectTypes]
+        vis_objects_type = [ele["objectType"] for ele in vis_objects]
         obj_pose = []
         for objType in self.objectTypes:
             if objType in vis_objects_type:

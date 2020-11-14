@@ -485,17 +485,30 @@ class PointNavObstaclesTask(Task[IThorEnvironment]):
             self.last_action_success = self._success
         elif action_str in [DIRECTIONAL_AHEAD_PUSH, DIRECTIONAL_BACK_PUSH,
                             DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH]:
-            angle = [0.001, 180, 90, 270][action - 5]
-            obj = self.env.moveable_closest_obj_by_types(self.task_info["obstacles_types"])
-            if obj != None:
-                self.env.step({"action": action_str,
-                               "objectId": obj["objectId"],
-                               "moveMagnitude": obj["mass"] * 100,
-                               "pushAngle": angle,
-                               "autoSimulation": False})
-                self.last_action_success = self.env.last_action_success
+            if action_str not in [DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH]:
+                angle = [0.001, 180, 90, 270][action - 5]
+                obj = self.env.moveable_closest_obj_by_types(self.task_info["obstacles_types"])
+                if obj != None:
+                    self.env.step({"action": action_str,
+                                   "objectId": obj["objectId"],
+                                   "moveMagnitude": obj["mass"] * 100,
+                                   "pushAngle": angle,
+                                   "autoSimulation": False})
+                    self.last_action_success = self.env.last_action_success
+                else:
+                    self.last_action_success = False
             else:
-                self.last_action_success = False
+                angle = [0.001, 180, 90, 270][action - 5]
+                obj = self.env.moveable_closest_obj_by_types(self.task_info["obstacles_types"])
+                if obj != None:
+                    self.env.step({"action": action_str,
+                                   "objectId": obj["objectId"],
+                                   "moveMagnitude": obj["mass"] * 100,
+                                   "pushAngle": angle,
+                                   "autoSimulation": False})
+                    self.last_action_success = self.env.last_action_success
+                else:
+                    self.last_action_success = False
         elif action_str in [LOOK_UP, LOOK_DOWN]:
             self.env.step({"action": action_str})
             self.last_action_success = self.env.last_action_success

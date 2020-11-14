@@ -316,6 +316,16 @@ class PointNavKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[CategoricalD
         NPM_hidden = self.NPM(hidden_feature)
         NPM_hidden = NPM_hidden
         M = NPM_hidden.view(nb, ng, no, na, 3, 4)
+        """
+        M_test = M.clone()
+        M_test[:, :, :, 7] = torch.Tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]).to(M.device)
+        out, rnn_hidden_states, new_keypoints = self.get_action(M, keypoints_homo, obstacles_rot_hidden,
+                                                                obstacles_meta_hidden, a_feature, obstacles_state_hidden,
+                                                                nb, ng, x, memory, masks, keypoints)
+        out_test, _, new_keypoints_test = self.get_action(M_test, keypoints_homo, obstacles_rot_hidden,
+                                                                obstacles_meta_hidden, a_feature, obstacles_state_hidden,
+                                                                nb, ng, x, memory, masks, keypoints, True)
+        """
         new_keypoints = torch.matmul(M, keypoints_homo.transpose(4, 5)).transpose(4, 5)
         new_obstacles_state_hidden = self.state_encoding(new_keypoints.mean(4))
 
@@ -343,6 +353,34 @@ class PointNavKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[CategoricalD
             out = {"ac_output": out, "npm_output": NPM_out}
 
         return out, memory.set_tensor("rnn", rnn_hidden_states)
+
+    def get_action(self, M, keypoints_homo, obstacles_rot_hidden, obstacles_meta_hidden, a_feature, obstacles_state_hidden,
+                   nb, ng, x, memory, masks, keypoints, second=False):
+        new_keypoints = torch.matmul(M, keypoints_homo.transpose(4, 5)).transpose(4, 5)
+        if second:
+            new_keypoints[:,:,:,7] = keypoints[:,:,:,7].clone()
+        new_obstacles_state_hidden = self.state_encoding(new_keypoints.mean(4))
+
+        atten_feature = torch.cat((obstacles_rot_hidden, obstacles_meta_hidden, a_feature), dim=4)
+        hidden_feature = torch.cat((obstacles_meta_hidden, obstacles_state_hidden, new_obstacles_state_hidden,
+                                    a_feature), dim=4)
+        NPM_atten_score = self.NPM_atten(atten_feature)
+        NPM_atten_prob = nn.functional.softmax(NPM_atten_score, 2)
+        NPM_atten_hidden = (hidden_feature * NPM_atten_prob).sum(2)
+        NPM_atten_hidden = self.NPM_summary(NPM_atten_hidden)
+        NPM_atten_hidden = NPM_atten_hidden.view(nb, ng, -1)
+        if second:
+            x[-1] = NPM_atten_hidden
+        else:
+            x.append(NPM_atten_hidden)
+
+        y = torch.cat(x, dim=-1)
+        y, rnn_hidden_states = self.state_encoder(y, memory.tensor("rnn"), masks)
+
+        out = ActorCriticOutput(
+            distributions=self.actor(y), values=self.critic(y), extras={}
+        )
+        return out, rnn_hidden_states, new_keypoints
 
 
 class PointNavKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
