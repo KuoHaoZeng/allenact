@@ -688,7 +688,7 @@ class PlacementTask(Task[IThorEnvironment]):
             self.task_info["target"]
         )
         self.obj_last_geodesic_distance = self.obj_dist_to_target()
-        self.last_tget_in_path = False
+        self.last_both_in_path = False
 
         self.optimal_distance = self.last_geodesic_distance + self.obj_last_geodesic_distance
         self._rewards: List[float] = []
@@ -840,11 +840,35 @@ class PlacementTask(Task[IThorEnvironment]):
 
         return rew * self.reward_configs["shaping_weight"]
 
+    def shaping_by_path(self) -> float:
+        reward = 0.0
+        if self.env.last_action in [DIRECTIONAL_AHEAD_PUSH, DIRECTIONAL_BACK_PUSH,
+                                    DIRECTIONAL_RIGHT_PUSH, DIRECTIONAL_LEFT_PUSH]:
+            objs = self.env.get_objects_by_type(self.task_info["object_type"])
+            objs_in_path = False
+            for obj in objs:
+                if self.env.target_in_reachable_points(obj["position"]):
+                    objs_in_path = True
+                    break
+
+            tgt_obj = self.env.get_objects_by_type(self.task_info["target_type"])[0]
+            tget_in_path = self.env.target_in_reachable_points(tgt_obj["position"])
+
+            both_in_path = objs_in_path and tget_in_path
+
+            if both_in_path and not self.last_both_in_path:
+                reward += 0.5
+            elif not both_in_path and self.last_both_in_path:
+                reward -= 0.5
+            self.last_both_in_path = both_in_path
+        return reward
+
     def judge(self) -> float:
         """Judge the last event."""
         #reward = self.reward_configs["step_penalty"]
         reward = 0.
 
+        reward += self.shaping_by_path()
         reward += self.shaping()
 
         if self._took_end_action:
@@ -902,7 +926,7 @@ class PlacementTask(Task[IThorEnvironment]):
             "total_reward": total_reward,
             "dist_to_target": dist2tget,
             "spl": spl,
-            "target_in_reachable_points": self.last_tget_in_path,
+            "both_in_reachable_points": self.last_both_in_path,
         }
 
     def query_expert(self, end_action_only: bool = False, **kwargs) -> Tuple[int, bool]:
