@@ -827,7 +827,7 @@ class PlacementTask(Task[IThorEnvironment]):
             rew += self.obj_last_geodesic_distance - geodesic_distance
         """
         if geodesic_distance < self.obj_last_geodesic_distance:
-            rew += 0.2
+            rew += 0.02
         self.obj_last_geodesic_distance = geodesic_distance
 
         """
