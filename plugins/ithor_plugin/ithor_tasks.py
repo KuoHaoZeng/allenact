@@ -820,10 +820,14 @@ class PlacementTask(Task[IThorEnvironment]):
 
         if geodesic_distance == -1.0:
             geodesic_distance = self.obj_last_geodesic_distance
+        """
         if (
                 self.obj_last_geodesic_distance > -0.5 and geodesic_distance > -0.5
         ):  # (robothor limits)
             rew += self.obj_last_geodesic_distance - geodesic_distance
+        """
+        if geodesic_distance < self.obj_last_geodesic_distance:
+            rew += 0.2
         self.obj_last_geodesic_distance = geodesic_distance
 
         """
@@ -868,7 +872,7 @@ class PlacementTask(Task[IThorEnvironment]):
         #reward = self.reward_configs["step_penalty"]
         reward = 0.
 
-        reward += self.shaping_by_path()
+        #reward += self.shaping_by_path()
         reward += self.shaping()
 
         if self._took_end_action:
