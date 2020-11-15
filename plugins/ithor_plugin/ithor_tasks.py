@@ -826,6 +826,7 @@ class PlacementTask(Task[IThorEnvironment]):
             rew += self.obj_last_geodesic_distance - geodesic_distance
         self.obj_last_geodesic_distance = geodesic_distance
 
+        """
         geodesic_distance = self.dist_to_target()
 
         if geodesic_distance == -1.0:
@@ -835,6 +836,7 @@ class PlacementTask(Task[IThorEnvironment]):
         ):  # (robothor limits)
             rew += self.last_geodesic_distance - geodesic_distance
         self.last_geodesic_distance = geodesic_distance
+        """
 
         return rew * self.reward_configs["shaping_weight"]
 
