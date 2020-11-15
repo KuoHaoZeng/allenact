@@ -11,13 +11,13 @@ import torch
 from constants import ABS_PATH_OF_TOP_LEVEL_DIR
 from core.base_abstractions.preprocessor import ObservationSet
 from core.base_abstractions.task import TaskSampler
-from plugins.ithor_plugin.ithor_task_samplers import PointNavObstaclesDatasetTaskSampler
-from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesTask
+from plugins.ithor_plugin.ithor_task_samplers import PlacementDatasetTaskSampler
+from plugins.ithor_plugin.ithor_tasks import PlacementTask
 from projects.objectnav_baselines.experiments.objectnav_base import ObjectNavBaseConfig
 from utils.experiment_utils import Builder
 
 
-class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
+class PlacementThorBaseConfig(ObjectNavBaseConfig, ABC):
     """The base config for all iTHOR PointNav experiments."""
 
     ADVANCE_SCENE_ROLLOUT_PERIOD: Optional[int] = None
@@ -31,25 +31,24 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             #local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
         )
 
-        self.NUM_PROCESSES = 80
-        self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
-        #self.TRAIN_GPU_IDS = [1]
+        self.NUM_PROCESSES = 1
+        #self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
+        self.TRAIN_GPU_IDS = [1]
         self.VALID_GPU_IDS = [torch.cuda.device_count() - 1]
-        #self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
-        self.TEST_GPU_IDS = [1]
+        self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
 
         self.TRAIN_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles_v2/train"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-placement_v2/train"
         )
         self.VAL_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles_v2/val"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-placement_v2/val"
         )
 
         self.TARGET_TYPES = None
         self.SENSORS = None
-        self.OBSTACLES_TYPES = ["ArmChair", "DogBed", "Box", "Chair", "Desk", "DiningTable", "SideTable", "Sofa",
+        self.OBSTACLES_TYPES = sorted(["ArmChair", "DogBed", "Box", "Chair", "Desk", "DiningTable", "SideTable", "Sofa",
                                 "Stool", "Television", "Pillow", "Bread", "Apple", "AlarmClock", "Lettuce",
-                                "GarbageCan", "Laptop", "Microwave", "Pot", "Tomato"]
+                                "GarbageCan", "Laptop", "Microwave", "Pot", "Tomato"])
 
     def split_num_processes(self, ndevices):
         assert self.NUM_PROCESSES >= ndevices, "NUM_PROCESSES {} < ndevices {}".format(
@@ -113,7 +112,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
 
     @classmethod
     def make_sampler_fn(cls, **kwargs) -> TaskSampler:
-        return PointNavObstaclesDatasetTaskSampler(**kwargs)
+        return PlacementDatasetTaskSampler(**kwargs)
 
     @staticmethod
     def _partition_inds(n: int, num_parts: int):
@@ -162,7 +161,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             "max_steps": self.MAX_STEPS,
             "sensors": self.SENSORS,
             "action_space": gym.spaces.Discrete(
-                len(PointNavObstaclesTask.class_action_names())
+                len(PlacementTask.class_action_names())
             ),
             "seed": seeds[process_ind] if seeds is not None else None,
             "deterministic_cudnn": deterministic_cudnn,

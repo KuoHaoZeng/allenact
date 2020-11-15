@@ -347,6 +347,13 @@ class IThorEnvironment(object):
             return metrics.path_distance(path)
         return -1.0
 
+    def object_distance_to_point(self, obj_idx, target):
+        return self.distance_cache.find_distance(
+            self.controller.last_event.metadata["objects"][obj_idx]["position"],
+            target,
+            self.distance_from_point_to_point,
+        )
+
     def distance_to_point(self, target: Dict[str, float]) -> float:
         """Minimal geodesic distance to end point from agent's current
         location.
@@ -393,6 +400,24 @@ class IThorEnvironment(object):
         )
         return e.metadata["lastActionSuccess"]
 
+    def spawn_target_circle(self, seed):
+        obj = self.get_objects_by_name("Floor")
+        e = self.controller.step(
+            action="SpawnTargetCircle",
+            objectId=obj["objectId"],
+            anywhere=True,
+            objectVariation=2,
+            randomSeed=seed
+        )
+        return e.metadata["lastActionSuccess"]
+
+    def get_objects_by_name(self, object_name):
+        objs = self.all_objects()
+        for obj in objs:
+            if object_name in obj["name"]:
+                return obj
+        return None
+
     def target_in_reachable_points(self, tget) -> bool:
         reachable_points = self.currently_reachable_points
         reachable_points = np.array([[ele["x"], ele["z"]] for ele in reachable_points])
@@ -420,6 +445,16 @@ class IThorEnvironment(object):
         objs = self.all_objects()
         objs = [ele for ele in objs if ele["objectType"] in objectTypes]
         return objs
+
+    def get_objects_and_idx_by_type(self, objectTypes):
+        objs = self.all_objects()
+        obj, idx = [], []
+        for idy, ele in enumerate(objs):
+            if ele["objectType"] in objectTypes:
+                obj.append(ele)
+                idx.append(idy)
+                break
+        return obj, idx
 
     def moveable_closest_obj_by_types(self, objectTypes):
         objs = self.visible_objects()
