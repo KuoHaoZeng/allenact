@@ -31,9 +31,9 @@ class PlacementThorBaseConfig(ObjectNavBaseConfig, ABC):
             #local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
         )
 
-        self.NUM_PROCESSES = 1
-        #self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
-        self.TRAIN_GPU_IDS = [1]
+        self.NUM_PROCESSES = 80
+        self.TRAIN_GPU_IDS = list(range(torch.cuda.device_count()))
+        #self.TRAIN_GPU_IDS = [1]
         self.VALID_GPU_IDS = [torch.cuda.device_count() - 1]
         self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
 
@@ -78,7 +78,7 @@ class PlacementThorBaseConfig(ObjectNavBaseConfig, ABC):
             nprocesses = 1
             gpu_ids = [] if not torch.cuda.is_available() else self.VALID_GPU_IDS
         elif mode == "test":
-            nprocesses = 1
+            nprocesses = 15
             gpu_ids = [] if not torch.cuda.is_available() else self.TEST_GPU_IDS
         else:
             raise NotImplementedError("mode must be 'train', 'valid', or 'test'.")

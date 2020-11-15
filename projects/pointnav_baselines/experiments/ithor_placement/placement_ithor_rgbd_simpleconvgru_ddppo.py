@@ -57,12 +57,12 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(10000000)
+        ppo_steps = int(20000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
         num_steps = 30
-        save_interval = 100000
+        save_interval = 1000000
         log_interval = 100
         gamma = 0.99
         use_gae = True
