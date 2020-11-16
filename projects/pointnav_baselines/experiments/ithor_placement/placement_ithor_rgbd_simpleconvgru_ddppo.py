@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from core.algorithms.onpolicy_sync.losses import PPO, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
+from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GoalObjectTypeThorSensor,
@@ -43,6 +44,11 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             ),
             GoalObjectTypeThorSensor(self.OBSTACLES_TYPES),
             GPSCompassSensorIThor(),
+            ExpertActionSensor(
+                nactions=len(PlacementTask.class_action_names()),
+                uuid="expert_action",
+                expert_args={"end_action_only": True}
+            ),
         ]
 
         self.PREPROCESSORS = []
@@ -52,6 +58,7 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "depth",
             "goal_object_type_ind",
             "target_coordinates_ind",
+            "expert_action",
         ]
 
     @classmethod

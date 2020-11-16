@@ -7,6 +7,7 @@ from core.algorithms.onpolicy_sync.losses import PPO, NPM_Reg, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
+from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GoalObjectTypeThorSensor,
@@ -73,6 +74,11 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                 objectTypes=self.OBSTACLES_TYPES,
                 uuid="object_action_mask"
             ),
+            ExpertActionSensor(
+                nactions=len(PlacementTask.class_action_names()),
+                uuid="expert_action",
+                expert_args={"end_action_only": True}
+            ),
         ]
 
         self.PREPROCESSORS = []
@@ -88,6 +94,7 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "agent_pose_global",
             "object_update_mask",
             "object_action_mask",
+            "expert_action",
         ]
 
     @classmethod
