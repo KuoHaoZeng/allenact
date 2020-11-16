@@ -824,6 +824,7 @@ class PlacementTask(Task[IThorEnvironment]):
                 self.obj_last_geodesic_distance > -0.5 and geodesic_distance > -0.5
         ):  # (robothor limits)
             rew += self.obj_last_geodesic_distance - geodesic_distance
+        self.obj_last_geodesic_distance = geodesic_distance
         """
         if geodesic_distance < self.obj_last_geodesic_distance:
             rew += 0.02
