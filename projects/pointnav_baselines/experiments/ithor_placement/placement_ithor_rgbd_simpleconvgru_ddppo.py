@@ -9,6 +9,7 @@ from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GoalObjectTypeThorSensor,
+    GPSCompassSensorIThor,
 )
 from plugins.ithor_plugin.ithor_tasks import PlacementTask
 from projects.pointnav_baselines.experiments.ithor_placement.placement_ithor_base import (
@@ -41,6 +42,7 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                 uuid="depth",
             ),
             GoalObjectTypeThorSensor(self.OBSTACLES_TYPES),
+            GPSCompassSensorIThor(),
         ]
 
         self.PREPROCESSORS = []
@@ -49,6 +51,7 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "rgb",
             "depth",
             "goal_object_type_ind",
+            "target_coordinates_ind",
         ]
 
     @classmethod
@@ -94,8 +97,11 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
         return PlacementActorCriticSimpleConvRNN(
             action_space=gym.spaces.Discrete(len(PlacementTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
-            goal_sensor_uuid="goal_object_type_ind",
+            goal_sensor_uuid="target_coordinates_ind",
+            object_sensor_uuid="goal_object_type_ind",
             hidden_size=512,
+            embed_coordinates=False,
+            coordinate_dims=2,
             object_type_embedding_dim=32,
             num_rnn_layers=1,
             rnn_type="GRU",

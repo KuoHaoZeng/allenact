@@ -10,6 +10,7 @@ from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GoalObjectTypeThorSensor,
+    GPSCompassSensorIThor,
     LocalKeyPoints3DSensorThor,
     GlobalKeyPoints3DSensorThor,
     GlobalObjPoseSensorThor,
@@ -48,6 +49,7 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                 uuid="depth",
             ),
             GoalObjectTypeThorSensor(self.OBSTACLES_TYPES),
+            GPSCompassSensorIThor(),
             LocalKeyPoints3DSensorThor(
                 objectTypes=self.OBSTACLES_TYPES,
                 uuid="3Dkeypoints_local"
@@ -79,6 +81,7 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "rgb",
             "depth",
             "goal_object_type_ind",
+            "target_coordinates_ind",
             "3Dkeypoints_local",
             "3Dkeypoints_global",
             "object_pose_global",
@@ -138,9 +141,12 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
         return PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(
             action_space=gym.spaces.Discrete(len(PlacementTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
-            goal_sensor_uuid="goal_object_type_ind",
+            goal_sensor_uuid="target_coordinates_ind",
+            object_sensor_uuid="goal_object_type_ind",
             obstacle_keypoints_sensor_uuid="3Dkeypoints_local",
             hidden_size=512,
+            embed_coordinates=False,
+            coordinate_dims=2,
             object_type_embedding_dim=32,
             obstacle_type_embedding_dim=32,
             obstacle_state_hidden_dim=64,

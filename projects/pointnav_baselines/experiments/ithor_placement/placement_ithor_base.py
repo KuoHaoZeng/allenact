@@ -38,10 +38,10 @@ class PlacementThorBaseConfig(ObjectNavBaseConfig, ABC):
         self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
 
         self.TRAIN_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-placement_v2/train"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-placement_v3/train"
         )
         self.VAL_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-placement_v2/val"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-placement_v3/val"
         )
 
         self.TARGET_TYPES = None

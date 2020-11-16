@@ -820,7 +820,6 @@ class PlacementTask(Task[IThorEnvironment]):
 
         if geodesic_distance == -1.0:
             geodesic_distance = self.obj_last_geodesic_distance
-        """
         if (
                 self.obj_last_geodesic_distance > -0.5 and geodesic_distance > -0.5
         ):  # (robothor limits)
@@ -829,6 +828,7 @@ class PlacementTask(Task[IThorEnvironment]):
         if geodesic_distance < self.obj_last_geodesic_distance:
             rew += 0.02
         self.obj_last_geodesic_distance = geodesic_distance
+        """
 
         """
         geodesic_distance = self.dist_to_target()
@@ -855,8 +855,7 @@ class PlacementTask(Task[IThorEnvironment]):
                     objs_in_path = True
                     break
 
-            tgt_obj = self.env.get_objects_by_type(self.task_info["target_type"])[0]
-            tget_in_path = self.env.target_in_reachable_points(tgt_obj["position"])
+            tget_in_path = self.env.target_in_reachable_points(self.task_info["target"])
 
             both_in_path = objs_in_path and tget_in_path
 

@@ -908,7 +908,9 @@ class PlacementDatasetTaskSampler(TaskSampler):
             self.max_tasks -= 1
 
         if not self.env.teleport(
-                pose=episode["initial_position"], rotation=episode["initial_orientation"]
+                pose=episode["initial_position"],
+                rotation=episode["initial_orientation"],
+                horizon=episode["initial_horizon"]
         ):
             return self.next_task()
 

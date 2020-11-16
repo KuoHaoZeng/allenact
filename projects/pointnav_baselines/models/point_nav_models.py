@@ -640,7 +640,11 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
             action_space: gym.spaces.Discrete,
             observation_space: SpaceDict,
             goal_sensor_uuid: str,
+            object_sensor_uuid: str,
             hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
             object_type_embedding_dim=8,
             num_rnn_layers=1,
             rnn_type="GRU",
@@ -648,8 +652,14 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         super().__init__(action_space=action_space, observation_space=observation_space)
 
         self.goal_sensor_uuid = goal_sensor_uuid
+        self.object_sensor_uuid = object_sensor_uuid
         self._hidden_size = hidden_size
-        self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+        self._n_object_types = self.observation_space.spaces[self.object_sensor_uuid].n
         self.object_type_embedding_size = object_type_embedding_dim
 
         self.sensor_fusion = False
@@ -661,7 +671,7 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
 
         self.state_encoder = RNNStateEncoder(
             (0 if self.is_blind else self.recurrent_hidden_state_size)
-            + self.object_type_embedding_size,
+            + self.object_type_embedding_size + self.coorinate_embedding_size,
             self._hidden_size,
             num_layers=num_rnn_layers,
             rnn_type=rnn_type,
@@ -669,6 +679,11 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
 
         self.actor = LinearActorHead(self._hidden_size, action_space.n)
         self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
 
         self.object_type_embedding = nn.Embedding(
             num_embeddings=self._n_object_types,
@@ -689,13 +704,21 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
     def num_recurrent_layers(self):
         return self.state_encoder.num_recurrent_layers
 
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
     def get_object_type_encoding(
         self, observations: Dict[str, torch.FloatTensor]
     ) -> torch.FloatTensor:
         """Get the object type encoding from input batched observations."""
         # noinspection PyTypeChecker
         return self.object_type_embedding(  # type:ignore
-            observations[self.goal_sensor_uuid].to(torch.int64)
+            observations[self.object_sensor_uuid].to(torch.int64)
         )
 
     @property
@@ -722,11 +745,12 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
             masks: torch.FloatTensor,
             current_actions: torch.FloatTensor = None,
     ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
-        target_encoding = self.get_object_type_encoding(
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        object_encoding = self.get_object_type_encoding(
             cast(Dict[str, torch.FloatTensor], observations)
         )
         x: Union[torch.Tensor, List[torch.Tensor]]
-        x = [target_encoding]
+        x = [target_encoding, object_encoding]
 
         if not self.is_blind:
             perception_embed = self.visual_encoder(observations)
@@ -750,8 +774,12 @@ class PlacementKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[Categorical
             action_space: gym.spaces.Discrete,
             observation_space: SpaceDict,
             goal_sensor_uuid: str,
+            object_sensor_uuid: str,
             obstacle_keypoints_sensor_uuid: str,
             hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
             object_type_embedding_dim=8,
             obstacle_type_embedding_dim=8,
             obstacle_state_hidden_dim=16,
@@ -762,8 +790,14 @@ class PlacementKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[Categorical
         super().__init__(action_space=action_space, observation_space=observation_space)
 
         self.goal_sensor_uuid = goal_sensor_uuid
+        self.object_sensor_uuid = object_sensor_uuid
         self._hidden_size = hidden_size
-        self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+        self._n_object_types = self.observation_space.spaces[self.object_sensor_uuid].n
         self.object_type_embedding_size = object_type_embedding_dim
         self.obstacle_keypoints_sensor_uuid = obstacle_keypoints_sensor_uuid
         self.obstacle_type_embedding_size = obstacle_type_embedding_dim
@@ -778,7 +812,7 @@ class PlacementKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[Categorical
 
         self.state_encoder = RNNStateEncoder(
             (0 if self.is_blind else self.recurrent_hidden_state_size)
-            + self.object_type_embedding_size + obstacle_state_hidden_dim * action_space.n,
+            + self.object_type_embedding_size + self.coorinate_embedding_size + obstacle_state_hidden_dim * action_space.n,
             self._hidden_size,
             num_layers=num_rnn_layers,
             rnn_type=rnn_type,
@@ -786,6 +820,11 @@ class PlacementKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[Categorical
 
         self.actor = LinearActorHead(self._hidden_size, action_space.n)
         self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
 
         self.object_type_embedding = nn.Embedding(
             num_embeddings=self._n_object_types,
@@ -854,13 +893,21 @@ class PlacementKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[Categorical
     def num_recurrent_layers(self):
         return self.state_encoder.num_recurrent_layers
 
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
     def get_object_type_encoding(
         self, observations: Dict[str, torch.FloatTensor]
     ) -> torch.FloatTensor:
         """Get the object type encoding from input batched observations."""
         # noinspection PyTypeChecker
         return self.object_type_embedding(  # type:ignore
-            observations[self.goal_sensor_uuid].to(torch.int64)
+            observations[self.object_sensor_uuid].to(torch.int64)
         )
 
     @property
@@ -887,11 +934,12 @@ class PlacementKeyPointsNPMActorCriticSimpleConvRNN(ActorCriticModel[Categorical
             masks: torch.FloatTensor,
             current_actions: torch.FloatTensor = None,
     ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
-        target_encoding = self.get_object_type_encoding(
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        object_encoding = self.get_object_type_encoding(
             cast(Dict[str, torch.FloatTensor], observations)
         )
         x: Union[torch.Tensor, List[torch.Tensor]]
-        x = [target_encoding]
+        x = [target_encoding, object_encoding]
 
         if not self.is_blind:
             perception_embed = self.visual_encoder(observations)
@@ -996,8 +1044,12 @@ class PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[Categ
             action_space: gym.spaces.Discrete,
             observation_space: SpaceDict,
             goal_sensor_uuid: str,
+            object_sensor_uuid: str,
             obstacle_keypoints_sensor_uuid: str,
             hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
             object_type_embedding_dim=8,
             obstacle_type_embedding_dim=8,
             obstacle_state_hidden_dim=16,
@@ -1008,8 +1060,14 @@ class PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[Categ
         super().__init__(action_space=action_space, observation_space=observation_space)
 
         self.goal_sensor_uuid = goal_sensor_uuid
+        self.object_sensor_uuid = object_sensor_uuid
         self._hidden_size = hidden_size
-        self._n_object_types = self.observation_space.spaces[self.goal_sensor_uuid].n
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+        self._n_object_types = self.observation_space.spaces[self.object_sensor_uuid].n
         self.object_type_embedding_size = object_type_embedding_dim
         self.obstacle_keypoints_sensor_uuid = obstacle_keypoints_sensor_uuid
         self.obstacle_type_embedding_size = obstacle_type_embedding_dim
@@ -1024,7 +1082,7 @@ class PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[Categ
 
         self.state_encoder = RNNStateEncoder(
             (0 if self.is_blind else self.recurrent_hidden_state_size)
-            + self.object_type_embedding_size + obstacle_state_hidden_dim * action_space.n,
+            + self.object_type_embedding_size + self.coorinate_embedding_size + obstacle_state_hidden_dim * action_space.n,
             self._hidden_size,
             num_layers=num_rnn_layers,
             rnn_type=rnn_type,
@@ -1032,6 +1090,11 @@ class PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[Categ
 
         self.actor = LinearActorHead(self._hidden_size, action_space.n)
         self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
 
         self.object_type_embedding = nn.Embedding(
             num_embeddings=self._n_object_types,
@@ -1100,13 +1163,21 @@ class PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[Categ
     def num_recurrent_layers(self):
         return self.state_encoder.num_recurrent_layers
 
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
     def get_object_type_encoding(
         self, observations: Dict[str, torch.FloatTensor]
     ) -> torch.FloatTensor:
         """Get the object type encoding from input batched observations."""
         # noinspection PyTypeChecker
         return self.object_type_embedding(  # type:ignore
-            observations[self.goal_sensor_uuid].to(torch.int64)
+            observations[self.object_sensor_uuid].to(torch.int64)
         )
 
     @property
@@ -1133,11 +1204,12 @@ class PlacementKeyPointsVisualNPMActorCriticSimpleConvRNN(ActorCriticModel[Categ
             masks: torch.FloatTensor,
             current_actions: torch.FloatTensor = None,
     ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
-        target_encoding = self.get_object_type_encoding(
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        object_encoding = self.get_object_type_encoding(
             cast(Dict[str, torch.FloatTensor], observations)
         )
         x: Union[torch.Tensor, List[torch.Tensor]]
-        x = [target_encoding]
+        x = [target_encoding, object_encoding]
 
         if not self.is_blind:
             perception_embed = self.visual_encoder(observations)
