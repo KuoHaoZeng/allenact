@@ -5,7 +5,6 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from core.algorithms.onpolicy_sync.losses import PPO, NPM_Reg, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
-from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import (
