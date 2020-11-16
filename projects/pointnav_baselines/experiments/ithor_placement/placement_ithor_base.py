@@ -24,6 +24,8 @@ class PlacementThorBaseConfig(ObjectNavBaseConfig, ABC):
 
     def __init__(self):
         super().__init__()
+        self.REWARD_CONFIG["step_penalty"] = -0.002
+
         self.ENV_ARGS = dict(
             player_screen_width=self.SCREEN_SIZE,
             player_screen_height=self.SCREEN_SIZE,
