@@ -1,5 +1,5 @@
 import typing
-from typing import Tuple, Dict, Optional, Union, List, cast
+from typing import Tuple, Dict, Optional, Union, List, cast, Sequence
 
 import gym
 import torch
@@ -16,6 +16,245 @@ from core.algorithms.onpolicy_sync.policy import (
 from core.base_abstractions.distributions import CategoricalDistr
 from core.base_abstractions.misc import ActorCriticOutput, Memory
 from core.models.basic_models import SimpleCNN, RNNStateEncoder
+from utils.model_utils import make_cnn, compute_cnn_output
+import numpy as np
+
+class RGBDSCNN(nn.Module):
+    """A Simple N-Conv CNN followed by a fully connected layer. Takes in
+    observations (of type gym.spaces.dict) and produces an embedding of the
+    `rgb_uuid` and/or `depth_uuid` components.
+
+    # Attributes
+
+    observation_space : The observation_space of the agent, should have `rgb_uuid` or `depth_uuid` as
+        a component (otherwise it is a blind model).
+    output_size : The size of the embedding vector to produce.
+    """
+
+    def __init__(
+            self,
+            observation_space: SpaceDict,
+            output_size: int,
+            layer_channels: Sequence[int] = (32, 64, 32),
+            kernel_sizes: Sequence[Tuple[int, int]] = ((8, 8), (4, 4), (3, 3)),
+            layers_stride: Sequence[Tuple[int, int]] = ((4, 4), (2, 2), (1, 1)),
+            paddings: Sequence[Tuple[int, int]] = ((0, 0), (0, 0), (0, 0)),
+            dilations: Sequence[Tuple[int, int]] = ((1, 1), (1, 1), (1, 1)),
+            rgb_uuid: str = "rgb",
+            depth_uuid: str = "depth",
+            seg_uuid: str = "seg",
+            flatten: bool = True,
+            output_relu: bool = True,
+    ):
+        """Initializer.
+
+        # Parameters
+
+        observation_space : See class attributes documentation.
+        output_size : See class attributes documentation.
+        """
+        super().__init__()
+
+        self.rgb_uuid = rgb_uuid
+        if self.rgb_uuid in observation_space.spaces:
+            self._n_input_rgb = observation_space.spaces[self.rgb_uuid].shape[2]
+            assert self._n_input_rgb >= 0
+        else:
+            self._n_input_rgb = 0
+
+        self.depth_uuid = depth_uuid
+        if self.depth_uuid in observation_space.spaces:
+            self._n_input_depth = observation_space.spaces[self.depth_uuid].shape[2]
+            assert self._n_input_depth >= 0
+        else:
+            self._n_input_depth = 0
+
+        self.seg_uuid = seg_uuid
+        self._n_input_seg = 1
+
+        if not self.is_blind:
+            # hyperparameters for layers
+            self._cnn_layers_channels = list(layer_channels)
+            self._cnn_layers_kernel_size = list(kernel_sizes)
+            self._cnn_layers_stride = list(layers_stride)
+            self._cnn_layers_paddings = list(paddings)
+            self._cnn_layers_dilations = list(dilations)
+
+            if self._n_input_rgb > 0:
+                input_rgb_cnn_dims = np.array(
+                    observation_space.spaces[self.rgb_uuid].shape[:2], dtype=np.float32
+                )
+                self.rgb_cnn = self.make_cnn_from_params(
+                    output_size=output_size,
+                    input_dims=input_rgb_cnn_dims,
+                    input_channels=self._n_input_rgb,
+                    flatten=flatten,
+                    output_relu=output_relu,
+                )
+
+            if self._n_input_depth > 0:
+                input_depth_cnn_dims = np.array(
+                    observation_space.spaces[self.depth_uuid].shape[:2],
+                    dtype=np.float32,
+                )
+                self.depth_cnn = self.make_cnn_from_params(
+                    output_size=output_size,
+                    input_dims=input_depth_cnn_dims,
+                    input_channels=self._n_input_depth,
+                    flatten=flatten,
+                    output_relu=output_relu,
+                )
+
+            if self._n_input_seg > 0:
+                input_seg_cnn_dims = np.array(
+                    observation_space.spaces[self.depth_uuid].shape[:2],
+                    dtype=np.float32,
+                )
+                self.seg_cnn = self.make_cnn_from_params(
+                    output_size=output_size,
+                    input_dims=input_seg_cnn_dims,
+                    input_channels=self._n_input_depth,
+                    flatten=flatten,
+                    output_relu=output_relu,
+                )
+
+    def make_cnn_from_params(
+            self,
+            output_size: int,
+            input_dims: np.ndarray,
+            input_channels: int,
+            flatten: bool,
+            output_relu: bool,
+    ) -> nn.Module:
+        output_dims = input_dims
+        for kernel_size, stride, padding, dilation in zip(
+                self._cnn_layers_kernel_size,
+                self._cnn_layers_stride,
+                self._cnn_layers_paddings,
+                self._cnn_layers_dilations,
+        ):
+            # noinspection PyUnboundLocalVariable
+            output_dims = self._conv_output_dim(
+                dimension=output_dims,
+                padding=np.array(padding, dtype=np.float32),
+                dilation=np.array(dilation, dtype=np.float32),
+                kernel_size=np.array(kernel_size, dtype=np.float32),
+                stride=np.array(stride, dtype=np.float32),
+            )
+
+        # noinspection PyUnboundLocalVariable
+        cnn = make_cnn(
+            input_channels=input_channels,
+            layer_channels=self._cnn_layers_channels,
+            kernel_sizes=self._cnn_layers_kernel_size,
+            strides=self._cnn_layers_stride,
+            paddings=self._cnn_layers_paddings,
+            dilations=self._cnn_layers_dilations,
+            output_height=output_dims[0],
+            output_width=output_dims[1],
+            output_channels=output_size,
+            flatten=flatten,
+            output_relu=output_relu,
+        )
+        self.layer_init(cnn)
+
+        return cnn
+
+    @staticmethod
+    def _conv_output_dim(
+            dimension: Sequence[int],
+            padding: Sequence[int],
+            dilation: Sequence[int],
+            kernel_size: Sequence[int],
+            stride: Sequence[int],
+    ) -> Tuple[int, ...]:
+        """Calculates the output height and width based on the input height and
+        width to the convolution layer. For parameter definitions see.
+
+        [here](https://pytorch.org/docs/master/nn.html#torch.nn.Conv2d).
+
+        # Parameters
+
+        dimension : See above link.
+        padding : See above link.
+        dilation : See above link.
+        kernel_size : See above link.
+        stride : See above link.
+        """
+        assert len(dimension) == 2
+        out_dimension = []
+        for i in range(len(dimension)):
+            out_dimension.append(
+                int(
+                    np.floor(
+                        (
+                                (
+                                        dimension[i]
+                                        + 2 * padding[i]
+                                        - dilation[i] * (kernel_size[i] - 1)
+                                        - 1
+                                )
+                                / stride[i]
+                        )
+                        + 1
+                    )
+                )
+            )
+        return tuple(out_dimension)
+
+    @staticmethod
+    def layer_init(cnn) -> None:
+        """Initialize layer parameters using Kaiming normal."""
+        for layer in cnn:
+            if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                nn.init.kaiming_normal_(layer.weight, nn.init.calculate_gain("relu"))
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias, val=0)
+
+    @property
+    def is_blind(self):
+        """True if the observation space doesn't include `self.rgb_uuid` or
+        `self.depth_uuid`."""
+        return self._n_input_rgb + self._n_input_depth == 0
+
+    def forward(self, observations: Dict[str, torch.Tensor]):  # type: ignore
+        if self.is_blind:
+            return None
+
+        def check_use_agent(new_setting):
+            if use_agent is not None:
+                assert (
+                        use_agent is new_setting
+                ), "rgb and depth must both use an agent dim or none"
+            return new_setting
+
+        cnn_output_list: List[torch.Tensor] = []
+        use_agent: Optional[bool] = None
+
+        if self._n_input_rgb > 0:
+            use_agent = check_use_agent(len(observations[self.rgb_uuid]) == 6)
+            cnn_output_list.append(
+                compute_cnn_output(self.rgb_cnn, observations[self.rgb_uuid])
+            )
+
+        if self._n_input_depth > 0:
+            use_agent = check_use_agent(len(observations[self.depth_uuid]) == 6)
+            cnn_output_list.append(
+                compute_cnn_output(self.depth_cnn, observations[self.depth_uuid])
+            )
+
+        if self._n_input_seg > 0:
+            use_agent = check_use_agent(len(observations[self.seg_uuid]) == 6)
+            cnn_output_list.append(
+                compute_cnn_output(self.seg_cnn, observations[self.seg_uuid])
+            )
+
+        if use_agent:
+            channels_dim = 3  # [step, sampler, agent, channel (, height, width)]
+        else:
+            channels_dim = 2  # [step, sampler, channel (, height, width)]
+
+        return torch.cat(cnn_output_list, dim=channels_dim)
 
 
 class PointNavActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
@@ -118,6 +357,118 @@ class PointNavActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         #     print("rgb", (observations["rgb"][...,0,0,:].unsqueeze(-2).unsqueeze(-2) == observations["rgb"][...,0,0,:]).float().mean())
         #     if "depth" in observations:
         #         print("depth", (observations["depth"][...,0,0,:].unsqueeze(-2).unsqueeze(-2) == observations["depth"][...,0,0,:]).float().mean())
+
+        if not self.is_blind:
+            perception_embed = self.visual_encoder(observations)
+            if self.sensor_fusion:
+                perception_embed = self.sensor_fuser(perception_embed)
+            x = [perception_embed] + x
+
+        x = torch.cat(x, dim=-1)
+        x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
+
+        ac_output = ActorCriticOutput(
+            distributions=self.actor(x), values=self.critic(x), extras={}
+        )
+
+        return ac_output, memory.set_tensor("rnn", rnn_hidden_states)
+
+
+class PointNavRGBDSActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
+    def __init__(
+            self,
+            action_space: gym.spaces.Discrete,
+            observation_space: SpaceDict,
+            goal_sensor_uuid: str,
+            hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
+            num_rnn_layers=1,
+            rnn_type="GRU",
+    ):
+        super().__init__(action_space=action_space, observation_space=observation_space)
+
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self._hidden_size = hidden_size
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+
+        self.sensor_fusion = False
+        if "rgb" in observation_space.spaces and "depth" in observation_space.spaces:
+            self.sensor_fuser = nn.Linear(hidden_size * 3, hidden_size)
+            self.sensor_fusion = True
+
+        self.visual_encoder = RGBDSCNN(observation_space, hidden_size)
+
+        self.state_encoder = RNNStateEncoder(
+            (0 if self.is_blind else self.recurrent_hidden_state_size)
+            + self.coorinate_embedding_size,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+            )
+
+        self.actor = LinearActorHead(self._hidden_size, action_space.n)
+        self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
+
+        self.train()
+
+    @property
+    def output_size(self):
+        return self._hidden_size
+
+    @property
+    def is_blind(self):
+        return self.visual_encoder.is_blind
+
+    @property
+    def num_recurrent_layers(self):
+        return self.state_encoder.num_recurrent_layers
+
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
+    @property
+    def recurrent_hidden_state_size(self):
+        return self._hidden_size
+
+    def _recurrent_memory_specification(self):
+        return dict(
+            rnn=(
+                (
+                    ("layer", self.num_recurrent_layers),
+                    ("sampler", None),
+                    ("hidden", self.recurrent_hidden_state_size),
+                ),
+                torch.float32,
+            )
+        )
+
+    def forward(  # type:ignore
+            self,
+            observations: ObservationType,
+            memory: Memory,
+            prev_actions: torch.Tensor,
+            masks: torch.FloatTensor,
+            current_actions: torch.FloatTensor = None,
+    ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        x: Union[torch.Tensor, List[torch.Tensor]]
+        x = [target_encoding]
 
         if not self.is_blind:
             perception_embed = self.visual_encoder(observations)
@@ -714,6 +1065,140 @@ class PlacementActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
 
     def get_object_type_encoding(
         self, observations: Dict[str, torch.FloatTensor]
+    ) -> torch.FloatTensor:
+        """Get the object type encoding from input batched observations."""
+        # noinspection PyTypeChecker
+        return self.object_type_embedding(  # type:ignore
+            observations[self.object_sensor_uuid].to(torch.int64)
+        )
+
+    @property
+    def recurrent_hidden_state_size(self):
+        return self._hidden_size
+
+    def _recurrent_memory_specification(self):
+        return dict(
+            rnn=(
+                (
+                    ("layer", self.num_recurrent_layers),
+                    ("sampler", None),
+                    ("hidden", self.recurrent_hidden_state_size),
+                ),
+                torch.float32,
+            )
+        )
+
+    def forward(  # type:ignore
+            self,
+            observations: ObservationType,
+            memory: Memory,
+            prev_actions: torch.Tensor,
+            masks: torch.FloatTensor,
+            current_actions: torch.FloatTensor = None,
+    ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        object_encoding = self.get_object_type_encoding(
+            cast(Dict[str, torch.FloatTensor], observations)
+        )
+        x: Union[torch.Tensor, List[torch.Tensor]]
+        x = [target_encoding, object_encoding]
+
+        if not self.is_blind:
+            perception_embed = self.visual_encoder(observations)
+            if self.sensor_fusion:
+                perception_embed = self.sensor_fuser(perception_embed)
+            x = [perception_embed] + x
+
+        x = torch.cat(x, dim=-1)
+        x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
+
+        ac_output = ActorCriticOutput(
+            distributions=self.actor(x), values=self.critic(x), extras={}
+        )
+
+        return ac_output, memory.set_tensor("rnn", rnn_hidden_states)
+
+
+class PlacementRGBDSActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
+    def __init__(
+            self,
+            action_space: gym.spaces.Discrete,
+            observation_space: SpaceDict,
+            goal_sensor_uuid: str,
+            object_sensor_uuid: str,
+            hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
+            object_type_embedding_dim=8,
+            num_rnn_layers=1,
+            rnn_type="GRU",
+    ):
+        super().__init__(action_space=action_space, observation_space=observation_space)
+
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self.object_sensor_uuid = object_sensor_uuid
+        self._hidden_size = hidden_size
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+        self._n_object_types = self.observation_space.spaces[self.object_sensor_uuid].n
+        self.object_type_embedding_size = object_type_embedding_dim
+
+        self.sensor_fusion = False
+        if "rgb" in observation_space.spaces and "depth" in observation_space.spaces:
+            self.sensor_fuser = nn.Linear(hidden_size * 3, hidden_size)
+            self.sensor_fusion = True
+
+        self.visual_encoder = RGBDSCNN(observation_space, hidden_size)
+
+        self.state_encoder = RNNStateEncoder(
+            (0 if self.is_blind else self.recurrent_hidden_state_size)
+            + self.object_type_embedding_size + self.coorinate_embedding_size,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+            )
+
+        self.actor = LinearActorHead(self._hidden_size, action_space.n)
+        self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
+
+        self.object_type_embedding = nn.Embedding(
+            num_embeddings=self._n_object_types,
+            embedding_dim=object_type_embedding_dim,
+        )
+
+        self.train()
+
+    @property
+    def output_size(self):
+        return self._hidden_size
+
+    @property
+    def is_blind(self):
+        return self.visual_encoder.is_blind
+
+    @property
+    def num_recurrent_layers(self):
+        return self.state_encoder.num_recurrent_layers
+
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
+    def get_object_type_encoding(
+            self, observations: Dict[str, torch.FloatTensor]
     ) -> torch.FloatTensor:
         """Get the object type encoding from input batched observations."""
         # noinspection PyTypeChecker

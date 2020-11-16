@@ -3,25 +3,27 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO
+from core.algorithms.onpolicy_sync.losses import PPO, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
+from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
+    GoalObjectTypeThorSensor,
     GPSCompassSensorIThor,
     ClassSegmentationSensorThor,
 )
-from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesTask
-from projects.pointnav_baselines.experiments.ithor_obstacles.pointnav_ithor_base import (
-    PointNaviThorBaseConfig,
+from plugins.ithor_plugin.ithor_tasks import PlacementTask
+from projects.pointnav_baselines.experiments.ithor_placement.placement_ithor_base import (
+    PlacementThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
-    PointNavRGBDSActorCriticSimpleConvRNN,
+    PlacementRGBDSActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
+from plugins.ithor_plugin.ithor_constants import END
 
-
-class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
+class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
     """An Point Navigation experiment configuration in iThor with RGBD
     input."""
 
@@ -41,12 +43,18 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 use_normalization=True,
                 uuid="depth",
             ),
+            GoalObjectTypeThorSensor(self.OBSTACLES_TYPES),
             GPSCompassSensorIThor(),
             ClassSegmentationSensorThor(
                 objectTypes=self.OBSTACLES_TYPES,
                 height=self.SCREEN_SIZE,
                 width=self.SCREEN_SIZE,
                 uuid="seg"
+            ),
+            ExpertActionSensor(
+                nactions=len(PlacementTask.class_action_names()),
+                uuid="expert_action",
+                expert_args={"end_action_only": True}
             ),
         ]
 
@@ -55,23 +63,25 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
         self.OBSERVATIONS = [
             "rgb",
             "depth",
+            "goal_object_type_ind",
             "target_coordinates_ind",
-            "seg"
+            "seg",
+            "expert_action",
         ]
 
     @classmethod
     def tag(cls):
-        return "Pointnav-iTHOR-RGBDS-SimpleConv-DDPPO"
+        return "Placement-iTHOR-RGBDS-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(2000000)
+        ppo_steps = int(20000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
         num_steps = 30
-        save_interval = 100000
-        log_interval = 10
+        save_interval = 1000000
+        log_interval = 100
         gamma = 0.99
         use_gae = True
         gae_lambda = 0.95
@@ -84,13 +94,14 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             update_repeats=update_repeats,
             max_grad_norm=max_grad_norm,
             num_steps=num_steps,
-            named_losses={"ppo_loss": PPO(**PPOConfig)},
+            named_losses={"ppo_loss": PPO(**PPOConfig),
+                          "yn_im_loss": YesNoImitation(yes_action_index=PlacementTask.class_action_names().index(END)),},
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "yn_im_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
@@ -99,13 +110,15 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return PointNavRGBDSActorCriticSimpleConvRNN(
-            action_space=gym.spaces.Discrete(len(PointNavObstaclesTask.class_action_names())),
+        return PlacementRGBDSActorCriticSimpleConvRNN(
+            action_space=gym.spaces.Discrete(len(PlacementTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",
+            object_sensor_uuid="goal_object_type_ind",
             hidden_size=512,
             embed_coordinates=False,
             coordinate_dims=2,
+            object_type_embedding_dim=32,
             num_rnn_layers=1,
             rnn_type="GRU",
         )

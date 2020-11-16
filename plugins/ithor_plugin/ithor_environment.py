@@ -487,10 +487,13 @@ class IThorEnvironment(object):
         return self.mask_rcnn_model([img])[0]
 
     def get_masks_by_object_types(self, objectTypes):
-        mask = np.zeros((self.current_frame.shape[0], self.current_frame.shape[0], len(objectTypes)))
+        mask = np.ones((self.current_frame.shape[0], self.current_frame.shape[0])) * len(objectTypes)
         for i, objType in enumerate(objectTypes):
-            mask[:, :, i] = self.get_mask_by_object_type(objType)
-        return mask
+            tmp = self.get_mask_by_object_type(objType)
+            mask[np.where(tmp)] = i
+        mask = mask.astype(np.float32)
+        mask /= len(objectTypes)
+        return np.expand_dims(mask, axis=2)
 
     def teleport_agent_to(
         self,

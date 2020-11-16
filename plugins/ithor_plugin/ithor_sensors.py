@@ -191,13 +191,13 @@ class ClassSegmentationSensorThor(Sensor):
                  objectTypes,
                  height: Optional[int] = None,
                  width: Optional[int] = None,
-                 uuid="class_segmentation"):
-        self.objectTypes = objectTypes
+                 uuid="seg"):
+        self.objectTypes = sorted(list(objectTypes))
         observation_space = gym.spaces.Box(
             low=0,
             high=1,
             shape=(height, width, len(objectTypes)),
-            dtype=np.float32,
+            dtype=np.float64,
         )
         super().__init__(**prepare_locals_for_super(locals()))
 
