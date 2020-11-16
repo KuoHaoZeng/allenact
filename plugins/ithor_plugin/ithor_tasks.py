@@ -869,8 +869,8 @@ class PlacementTask(Task[IThorEnvironment]):
 
     def judge(self) -> float:
         """Judge the last event."""
-        #reward = self.reward_configs["step_penalty"]
-        reward = 0.
+        reward = self.reward_configs["step_penalty"]
+        #reward = 0.
 
         #reward += self.shaping_by_path()
         reward += self.shaping()
