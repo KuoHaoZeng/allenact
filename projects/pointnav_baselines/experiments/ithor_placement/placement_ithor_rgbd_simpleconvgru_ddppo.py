@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO
+from core.algorithms.onpolicy_sync.losses import PPO, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
@@ -19,7 +19,7 @@ from projects.pointnav_baselines.models.point_nav_models import (
     PlacementActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
-
+from plugins.ithor_plugin.ithor_constants import END
 
 class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
     """An Point Navigation experiment configuration in iThor with RGBD
@@ -79,13 +79,14 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             update_repeats=update_repeats,
             max_grad_norm=max_grad_norm,
             num_steps=num_steps,
-            named_losses={"ppo_loss": PPO(**PPOConfig)},
+            named_losses={"ppo_loss": PPO(**PPOConfig),
+                          "yn_im_loss": YesNoImitation(yes_action_index=PlacementTask.class_action_names().index(END)),},
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "yn_im_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}

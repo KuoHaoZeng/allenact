@@ -808,7 +808,21 @@ class PlacementTask(Task[IThorEnvironment]):
         for obj in objs:
             if obj["objectId"] in tgt_obj["receptacleObjectIds"]:
                 return True
-        return False
+
+        tget = self.task_info["target"]
+        dist = self.obj_dist_to_target()
+
+        if -0.5 < dist <= 0.2:
+            return True
+        elif dist > 0.2:
+            return False
+        else:
+            get_logger().debug(
+                "No path for {} from {} to {}".format(
+                    self.env.scene_name, self.env.agent_state(), tget
+                )
+            )
+            return None
 
     def shaping(self) -> float:
         rew = 0.0
