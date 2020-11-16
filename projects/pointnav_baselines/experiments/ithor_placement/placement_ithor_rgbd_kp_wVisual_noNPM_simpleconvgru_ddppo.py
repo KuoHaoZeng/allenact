@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO
+from core.algorithms.onpolicy_sync.losses import PPO, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
@@ -49,6 +49,11 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                 objectTypes=self.OBSTACLES_TYPES,
                 uuid="3Dkeypoints_local"
             ),
+            ExpertActionSensor(
+                nactions=len(PlacementTask.class_action_names()),
+                uuid="expert_action",
+                expert_args={"end_action_only": True}
+            ),
         ]
 
         self.PREPROCESSORS = []
@@ -59,6 +64,7 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "goal_object_type_ind",
             "target_coordinates_ind",
             "3Dkeypoints_local",
+            "expert_action",
         ]
 
     @classmethod
@@ -88,13 +94,14 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             num_steps=num_steps,
             named_losses={
                 "ppo_loss": PPO(**PPOConfig),
+                "yn_im_loss": YesNoImitation(yes_action_index=PlacementTask.class_action_names().index(END)),
             },
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "yn_im_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
