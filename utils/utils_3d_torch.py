@@ -196,6 +196,32 @@ def project_3d_to_2d(points, agent_pose, w, h, half_fov):
     points_agent_coordinate_2d = project_to_2d(points_agent_coordinate, half_fov, w, h)
     return points_agent_coordinate_2d
 
+def plot_next_keypoints(points, frame, agent_pose=None):
+    frame = frame[0,0].detach().cpu().numpy()
+    points = points.detach().cpu().unsqueeze(0)
+    w = torch.Tensor([224])
+    h = torch.Tensor([224])
+    half_fov = torch.Tensor([45])
+    if not isinstance(agent_pose, type(None)):
+        points_2d = project_3d_to_2d(points, agent_pose, w, h, half_fov)
+    else:
+        points_2d = project_to_2d(points, half_fov, w, h)
+    points_2d = [[ele[1], ele[0]] for ele in points_2d[0].numpy()]
+    img = Image.fromarray(frame)
+    img = draw_point(img, points_2d)
+    return img
+
+def save_keypoints_results(points):
+    w = torch.Tensor([224])
+    h = torch.Tensor([224])
+    half_fov = torch.Tensor([45])
+    points = points.detach().cpu()[5:9]
+    points_2d = []
+    for p in points:
+        points_2d.append(project_to_2d(p.unsqueeze(0), half_fov, w, h))
+    points_2d = torch.cat(points_2d).numpy()
+    np.save("storage/keypoints_2d.npy", points_2d)
+
 def dict_to_list(pos):
     return [pos["x"], pos["y"], pos["z"]]
 

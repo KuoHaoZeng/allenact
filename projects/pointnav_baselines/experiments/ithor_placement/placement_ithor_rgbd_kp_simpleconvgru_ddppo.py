@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO, NPM_Reg
+from core.algorithms.onpolicy_sync.losses import PPO, NPM_Reg, YesNoImitation
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
+from core.base_abstractions.sensor import ExpertActionSensor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GoalObjectTypeThorSensor,
@@ -25,6 +26,7 @@ from projects.pointnav_baselines.models.point_nav_models import (
     PlacementKeyPointsNPMActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
+from plugins.ithor_plugin.ithor_constants import END
 
 
 class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
@@ -71,7 +73,12 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             GlobalObjActionMaskSensorThor(
                 objectTypes=self.OBSTACLES_TYPES,
                 uuid="object_action_mask"
-            )
+            ),
+            ExpertActionSensor(
+                nactions=len(PlacementTask.class_action_names()),
+                uuid="expert_action",
+                expert_args={"end_action_only": True}
+            ),
         ]
 
         self.PREPROCESSORS = []
@@ -87,6 +94,7 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "agent_pose_global",
             "object_update_mask",
             "object_action_mask",
+            "expert_action",
         ]
 
     @classmethod
@@ -95,7 +103,7 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(20000000)
+        ppo_steps = int(10000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
@@ -121,14 +129,15 @@ class PlacementThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                                     local_keypoints_uuid="3Dkeypoints_local",
                                     global_keypoints_uuid="3Dkeypoints_global",
                                     obj_update_mask_uuid="object_update_mask",
-                                    obj_action_mask_uuid="object_action_mask",)
+                                    obj_action_mask_uuid="object_action_mask",),
+                "yn_im_loss": YesNoImitation(yes_action_index=PlacementTask.class_action_names().index(END)),
             },
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss", "npm_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "npm_loss", "yn_im_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}

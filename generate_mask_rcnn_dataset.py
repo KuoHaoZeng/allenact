@@ -30,9 +30,11 @@ OBJECT_TYPES = sorted(list(OBSTACLES_TYPES))
 
 OBJECT_TYPES_TO_ID = {object_type:i+1 for i, object_type in enumerate(OBJECT_TYPES)}
 
-SCENE_NAMES = constants.TRAIN_SCENE_NAMES[60:]
+#SCENE_NAMES = constants.TRAIN_SCENE_NAMES[60:]
+SCENE_NAMES = constants.TEST_SCENE_NAMES
 
-TRAIN_DATASET_DIR = "datasets/ithor-pointnav-obstacles_v2/train"
+#TRAIN_DATASET_DIR = "datasets/ithor-pointnav-obstacles_v2/train"
+TRAIN_DATASET_DIR = "datasets/ithor-pointnav-obstacles_v2/test"
 
 
 def main(args, thread_num=0):

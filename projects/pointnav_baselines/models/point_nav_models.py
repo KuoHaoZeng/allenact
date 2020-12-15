@@ -17,6 +17,7 @@ from core.base_abstractions.distributions import CategoricalDistr
 from core.base_abstractions.misc import ActorCriticOutput, Memory
 from core.models.basic_models import SimpleCNN, RNNStateEncoder
 from utils.model_utils import make_cnn, compute_cnn_output
+from utils.utils_3d_torch import plot_next_keypoints, save_keypoints_results
 import numpy as np
 
 class RGBDSCNN(nn.Module):

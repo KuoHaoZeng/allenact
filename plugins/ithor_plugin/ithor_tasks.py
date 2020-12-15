@@ -26,7 +26,7 @@ from core.base_abstractions.task import Task
 from utils.system import get_logger
 
 from PIL import Image
-import os
+import os, json
 from utils.utils_3d_torch import project_3d_points_to_2d, draw_point
 import torch
 
@@ -782,8 +782,8 @@ class PlacementTask(Task[IThorEnvironment]):
             tgts_2d = np.array([[y, x] for (x, y) in tgts_2d])
 
             self.env.counter += 1
-            #method_name = "rgbd_kp_1xNPM"
-            method_name = "rgbd"
+            method_name = "rgbd_kp_3xNPM_visual_large"
+            #method_name = "rgbd"
             folder = "qualitative_results/{}/{}/{}".format(method_name,
                                                            self.task_info["scene"],
                                                            self.task_info["id"])

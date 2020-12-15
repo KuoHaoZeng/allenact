@@ -181,6 +181,34 @@ class DepthSensorIThor(DepthSensor[IThorEnvironment, Task[IThorEnvironment]]):
         return env.current_depth.copy()
 
 
+class FrameSensorThor(Sensor):
+    """Sensor for Class Segmentation in iTHOR.
+
+    Returns from a running IThorEnvironment instance, the current
+    class segmentation corresponding to the agent's egocentric view.
+    """
+    def __init__(self,
+                 height: Optional[int] = None,
+                 width: Optional[int] = None,
+                 uuid="frame"):
+        observation_space = gym.spaces.Box(
+            low=0,
+            high=1,
+            shape=(height, width, 3),
+            dtype=np.float64,
+        )
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def get_observation(
+            self,
+            env: IThorEnvironment,
+            task: Optional[ObjectNavTask],
+            *args: Any,
+            **kwargs: Any
+    ) -> Any:
+        return env.current_frame.copy()
+
+
 class ClassSegmentationSensorThor(Sensor):
     """Sensor for Class Segmentation in iTHOR.
 

@@ -17,6 +17,7 @@ from plugins.ithor_plugin.ithor_sensors import (
     GlobalAgentPoseSensorThor,
     GlobalObjUpdateMaskSensorThor,
     GlobalObjActionMaskSensorThor,
+    FrameSensorThor
 )
 from plugins.ithor_plugin.ithor_tasks import PlacementTask
 from projects.pointnav_baselines.experiments.ithor_placement.placement_ithor_base import (
@@ -78,6 +79,9 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                 uuid="expert_action",
                 expert_args={"end_action_only": True}
             ),
+            FrameSensorThor(height=self.SCREEN_SIZE,
+                            width=self.SCREEN_SIZE,
+                            uuid="frame")
         ]
 
         self.PREPROCESSORS = []
@@ -94,6 +98,7 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "object_update_mask",
             "object_action_mask",
             "expert_action",
+            "frame",
         ]
 
     @classmethod
@@ -102,7 +107,7 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(20000000)
+        ppo_steps = int(10000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
