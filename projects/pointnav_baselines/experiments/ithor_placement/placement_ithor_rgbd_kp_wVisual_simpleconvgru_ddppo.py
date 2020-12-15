@@ -17,7 +17,7 @@ from plugins.ithor_plugin.ithor_sensors import (
     GlobalAgentPoseSensorThor,
     GlobalObjUpdateMaskSensorThor,
     GlobalObjActionMaskSensorThor,
-    FrameSensorThor
+    #FrameSensorThor
 )
 from plugins.ithor_plugin.ithor_tasks import PlacementTask
 from projects.pointnav_baselines.experiments.ithor_placement.placement_ithor_base import (
@@ -79,9 +79,9 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
                 uuid="expert_action",
                 expert_args={"end_action_only": True}
             ),
-            FrameSensorThor(height=self.SCREEN_SIZE,
-                            width=self.SCREEN_SIZE,
-                            uuid="frame")
+            #FrameSensorThor(height=self.SCREEN_SIZE,
+            #                width=self.SCREEN_SIZE,
+            #                uuid="frame")
         ]
 
         self.PREPROCESSORS = []
@@ -98,7 +98,7 @@ class PlacementNaviThorRGBPPOExperimentConfig(PlacementThorBaseConfig):
             "object_update_mask",
             "object_action_mask",
             "expert_action",
-            "frame",
+            #"frame",
         ]
 
     @classmethod
