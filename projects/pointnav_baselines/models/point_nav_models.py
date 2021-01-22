@@ -525,6 +525,152 @@ class PointNavPBLActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         return out, memory.set_tensor("rnn", rnn_hidden_states)
 
 
+class PointNavCPCActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
+    def __init__(
+            self,
+            action_space: gym.spaces.Discrete,
+            observation_space: SpaceDict,
+            goal_sensor_uuid: str,
+            hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
+            num_rnn_layers=1,
+            rnn_type="GRU",
+    ):
+        super().__init__(action_space=action_space, observation_space=observation_space)
+
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self._hidden_size = hidden_size
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+
+        self.sensor_fusion = False
+        if "rgb" in observation_space.spaces and "depth" in observation_space.spaces:
+            self.sensor_fuser = nn.Linear(hidden_size * 2, hidden_size)
+            self.sensor_fusion = True
+        self.sensor_fuser_2 = nn.Linear(self.coorinate_embedding_size + hidden_size, hidden_size)
+
+        self.visual_encoder = SimpleCNN(observation_space, hidden_size)
+
+        self.state_encoder = RNNStateEncoder(
+            (0 if self.is_blind else self.recurrent_hidden_state_size) + 1,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+            )
+
+        self.state_encoder_predict = RNNStateEncoder(
+            1,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(self._hidden_size * 2, self._hidden_size),
+            nn.ReLU(),
+            nn.Linear(self._hidden_size, 1),
+        )
+
+        self.actor = LinearActorHead(self._hidden_size, action_space.n)
+        self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
+
+        self.train()
+
+    @property
+    def output_size(self):
+        return self._hidden_size
+
+    @property
+    def is_blind(self):
+        return self.visual_encoder.is_blind
+
+    @property
+    def num_recurrent_layers(self):
+        return self.state_encoder.num_recurrent_layers
+
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
+    @property
+    def recurrent_hidden_state_size(self):
+        return self._hidden_size
+
+    def _recurrent_memory_specification(self):
+        return dict(
+            rnn=(
+                (
+                    ("layer", self.num_recurrent_layers),
+                    ("sampler", None),
+                    ("hidden", self.recurrent_hidden_state_size),
+                ),
+                torch.float32,
+            )
+        )
+
+    def forward(  # type:ignore
+            self,
+            observations: ObservationType,
+            memory: Memory,
+            prev_actions: torch.Tensor,
+            masks: torch.FloatTensor,
+            current_actions: torch.FloatTensor = None,
+    ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        x: Union[torch.Tensor, List[torch.Tensor]]
+        x = [target_encoding]
+
+        if not self.is_blind:
+            perception_embed = self.visual_encoder(observations)
+            if self.sensor_fusion:
+                perception_embed = self.sensor_fuser(perception_embed)
+            x = torch.cat([perception_embed] + x, dim=-1)
+            x_obs = self.sensor_fuser_2(x)
+
+        x = [x_obs] + [prev_actions.squeeze(-1)]
+        x = torch.cat(x, dim=-1)
+        x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
+
+        out = ActorCriticOutput(
+            distributions=self.actor(x), values=self.critic(x), extras={}
+        )
+
+        if not isinstance(current_actions, type(None)):
+            nt, ng = current_actions.shape[0], current_actions.shape[1]
+            x_action = current_actions.squeeze(-1).view(1, nt * ng, 1).float()
+            b = x.view(1, nt * ng, -1)
+            m = masks.view(1, nt * ng, 1, 1)
+            x_pred, _ = self.state_encoder_predict(x_action, b, m)
+            x_pred = x_pred.view(nt, ng, -1)[:-1]
+
+            x_obs_positive = x_obs[1:]
+            concat_positive = torch.cat([x_pred, x_obs_positive], dim=-1)
+            logit_positive = self.classifier(concat_positive)
+
+            idx = torch.randperm(nt).to(x_obs.device)
+            x_obs_negative = x_obs[idx, :, :][1:]
+            concat_negative = torch.cat([x_pred, x_obs_negative], dim=-1)
+            logit_negative = self.classifier(concat_negative)
+
+            out = {"ac_output": out, "logit_positive": logit_positive, "logit_negative": logit_negative}
+
+        return out, memory.set_tensor("rnn", rnn_hidden_states)
+
+
 class PointNavRGBDSActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
     def __init__(
             self,
@@ -1438,6 +1584,174 @@ class PlacementPBLActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
             b = b.view(nt, ng, -1)
             out = {"ac_output": out, "x_obs": x_obs,
                    "x_forward": x_forward, "x_reverse": x_reverse, "b": b}
+
+        return out, memory.set_tensor("rnn", rnn_hidden_states)
+
+
+class PlacementCPCActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
+    def __init__(
+            self,
+            action_space: gym.spaces.Discrete,
+            observation_space: SpaceDict,
+            goal_sensor_uuid: str,
+            object_sensor_uuid: str,
+            hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
+            object_type_embedding_dim=8,
+            num_rnn_layers=1,
+            rnn_type="GRU",
+    ):
+        super().__init__(action_space=action_space, observation_space=observation_space)
+
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self.object_sensor_uuid = object_sensor_uuid
+        self._hidden_size = hidden_size
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+        self._n_object_types = self.observation_space.spaces[self.object_sensor_uuid].n
+        self.object_type_embedding_size = object_type_embedding_dim
+
+        self.sensor_fusion = False
+        if "rgb" in observation_space.spaces and "depth" in observation_space.spaces:
+            self.sensor_fuser = nn.Linear(hidden_size * 2, hidden_size)
+            self.sensor_fusion = True
+        self.sensor_fuser_2 = nn.Linear(self.object_type_embedding_size + self.coorinate_embedding_size + hidden_size, hidden_size)
+
+        self.visual_encoder = SimpleCNN(observation_space, hidden_size)
+
+        self.state_encoder = RNNStateEncoder(
+            (0 if self.is_blind else self.recurrent_hidden_state_size) + 1,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+            )
+
+        self.state_encoder_predict = RNNStateEncoder(
+            1,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(self._hidden_size * 2, self._hidden_size),
+            nn.ReLU(),
+            nn.Linear(self._hidden_size, 1),
+        )
+
+        self.actor = LinearActorHead(self._hidden_size, action_space.n)
+        self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
+
+        self.object_type_embedding = nn.Embedding(
+            num_embeddings=self._n_object_types,
+            embedding_dim=object_type_embedding_dim,
+        )
+
+        self.train()
+
+    @property
+    def output_size(self):
+        return self._hidden_size
+
+    @property
+    def is_blind(self):
+        return self.visual_encoder.is_blind
+
+    @property
+    def num_recurrent_layers(self):
+        return self.state_encoder.num_recurrent_layers
+
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
+    def get_object_type_encoding(
+            self, observations: Dict[str, torch.FloatTensor]
+    ) -> torch.FloatTensor:
+        """Get the object type encoding from input batched observations."""
+        # noinspection PyTypeChecker
+        return self.object_type_embedding(  # type:ignore
+            observations[self.object_sensor_uuid].to(torch.int64)
+        )
+
+    @property
+    def recurrent_hidden_state_size(self):
+        return self._hidden_size
+
+    def _recurrent_memory_specification(self):
+        return dict(
+            rnn=(
+                (
+                    ("layer", self.num_recurrent_layers),
+                    ("sampler", None),
+                    ("hidden", self.recurrent_hidden_state_size),
+                ),
+                torch.float32,
+            )
+        )
+
+    def forward(  # type:ignore
+            self,
+            observations: ObservationType,
+            memory: Memory,
+            prev_actions: torch.Tensor,
+            masks: torch.FloatTensor,
+            current_actions: torch.FloatTensor = None,
+    ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        object_encoding = self.get_object_type_encoding(
+            cast(Dict[str, torch.FloatTensor], observations)
+        )
+        x: Union[torch.Tensor, List[torch.Tensor]]
+        x = [target_encoding, object_encoding]
+
+        if not self.is_blind:
+            perception_embed = self.visual_encoder(observations)
+            if self.sensor_fusion:
+                perception_embed = self.sensor_fuser(perception_embed)
+            x = torch.cat([perception_embed] + x, dim=-1)
+            x_obs = self.sensor_fuser_2(x)
+
+        x = [x_obs] + [prev_actions.squeeze(-1)]
+        x = torch.cat(x, dim=-1)
+        x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
+
+        out = ActorCriticOutput(
+            distributions=self.actor(x), values=self.critic(x), extras={}
+        )
+
+        if not isinstance(current_actions, type(None)):
+            nt, ng = current_actions.shape[0], current_actions.shape[1]
+            x_action = current_actions.squeeze(-1).view(1, nt * ng, 1).float()
+            b = x.view(1, nt * ng, -1)
+            m = masks.view(1, nt * ng, 1, 1)
+            x_pred, _ = self.state_encoder_predict(x_action, b, m)
+            x_pred = x_pred.view(nt, ng, -1)[:-1]
+
+            x_obs_positive = x_obs[1:]
+            concat_positive = torch.cat([x_pred, x_obs_positive], dim=-1)
+            logit_positive = self.classifier(concat_positive)
+
+            idx = torch.randperm(nt).to(x_obs.device)
+            x_obs_negative = x_obs[idx, :, :][1:]
+            concat_negative = torch.cat([x_pred, x_obs_negative], dim=-1)
+            logit_negative = self.classifier(concat_negative)
+
+            out = {"ac_output": out, "logit_positive": logit_positive, "logit_negative": logit_negative}
 
         return out, memory.set_tensor("rnn", rnn_hidden_states)
 
