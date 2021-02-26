@@ -995,6 +995,8 @@ class PointNavObstaclesMissingActionTask(Task[IThorEnvironment]):
         self.task_info["action_names"] = self.action_names()
         self.num_moves_made = 0
         self.last_missing_action_made = False
+        self.num_missing_action_made = 0
+        self.num_action_made = 0
 
     @property
     def action_space(self):
@@ -1047,6 +1049,8 @@ class PointNavObstaclesMissingActionTask(Task[IThorEnvironment]):
         else:
             self.last_action_success = False
             self.last_missing_action_made = True
+            self.num_missing_action_made += 1
+        self.num_action_made += 1
 
         if len(self.path) > 1 and self.path[-1] != self.path[-2]:
             self.num_moves_made += 1
@@ -1192,6 +1196,8 @@ class PointNavObstaclesMissingActionTask(Task[IThorEnvironment]):
             "dist_to_target": dist2tget,
             "spl": spl,
             "target_in_reachable_points": self.last_tget_in_path,
+            "num_missing_action": self.num_missing_action_made,
+            "missing_action_ratio": self.num_missing_action_made / float(self.num_action_made),
         }
 
     def query_expert(self, end_action_only: bool = False, **kwargs) -> Tuple[int, bool]:
