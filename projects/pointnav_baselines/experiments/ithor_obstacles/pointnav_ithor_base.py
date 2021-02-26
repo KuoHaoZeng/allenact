@@ -41,7 +41,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles_v2/train"
         )
         self.VAL_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles_v2/val"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles_v2/test"
         )
 
         self.TARGET_TYPES = None
@@ -78,7 +78,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             nprocesses = 1
             gpu_ids = [] if not torch.cuda.is_available() else self.VALID_GPU_IDS
         elif mode == "test":
-            nprocesses = 15
+            nprocesses = 7
             gpu_ids = [] if not torch.cuda.is_available() else self.TEST_GPU_IDS
         else:
             raise NotImplementedError("mode must be 'train', 'valid', or 'test'.")

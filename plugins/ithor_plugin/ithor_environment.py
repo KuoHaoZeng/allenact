@@ -227,7 +227,7 @@ class IThorEnvironment(object):
                 player_screen_height=self._start_player_screen_height,
                 local_executable_path=self._local_thor_build,
                 quality=self._quality,
-                #fastActionEmit=True,
+                fastActionEmit=True,
                 server_class=ai2thor.fifo_server.FifoServer,
             )
 
@@ -269,8 +269,7 @@ class IThorEnvironment(object):
                 "fov": self._fov,
                 "makeAgentsVisible": self.make_agents_visible,
                 "alwaysReturnVisibleRange": self._always_return_visible_range,
-                #"fastActionEmit": True,
-                #"renderDepthImage": True,
+                "fastActionEmit": True,
                 **kwargs,
             }
         )
@@ -379,7 +378,7 @@ class IThorEnvironment(object):
         self, pose: Dict[str, float], rotation: Dict[str, float], horizon: float = 0.0
     ):
         e = self.controller.step(
-            action="TeleportFull",
+            action="Teleport",
             x=pose["x"],
             y=pose["y"],
             z=pose["z"],
@@ -525,7 +524,7 @@ class IThorEnvironment(object):
                     reachable = True
                     break
             if not reachable:
-                self.last_action = "TeleportFull"
+                self.last_action = "Teleport"
                 self.last_event.metadata[
                     "errorMessage"
                 ] = "Target position was not initially reachable."
