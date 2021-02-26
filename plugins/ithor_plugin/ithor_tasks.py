@@ -1207,3 +1207,226 @@ class PointNavObstaclesMissingActionTask(Task[IThorEnvironment]):
             return 0, False
         else:
             raise NotImplementedError
+
+
+class PointNavMissingActionTask(Task[IThorEnvironment]):
+    _actions = (MOVE_AHEAD, MOVE_BACK, ROTATE_LEFT, ROTATE_RIGHT, LOOK_DOWN, LOOK_UP, END)
+
+    def __init__(
+            self,
+            env: IThorEnvironment,
+            sensors: List[Sensor],
+            task_info: Dict[str, Any],
+            max_steps: int,
+            reward_configs: Dict[str, Any],
+            **kwargs,
+    ) -> None:
+        super().__init__(
+            env=env, sensors=sensors, task_info=task_info, max_steps=max_steps, **kwargs
+        )
+        self.reward_configs = reward_configs
+        self._took_end_action: bool = False
+        self._success: Optional[bool] = False
+        self.last_geodesic_distance = self.env.distance_to_point(
+            self.task_info["target"]
+        )
+        self.last_tget_in_path = False
+
+        self.optimal_distance = self.last_geodesic_distance
+        self._rewards: List[float] = []
+        self._distance_to_goal: List[float] = []
+        self._metrics = None
+        self.path: List[Any] = (
+            []
+        )  # the initial coordinate will be directly taken from the optimal path
+
+        self.task_info["followed_path"] = [self.env.agent_state()]
+        self.task_info["action_names"] = self.action_names()
+        self.num_moves_made = 0
+        self.last_missing_action_made = False
+        self.num_missing_action_made = 0
+        self.num_action_made = 0
+
+    @property
+    def action_space(self):
+        return gym.spaces.Discrete(len(self._actions))
+
+    def reached_terminal_state(self) -> bool:
+        return self._took_end_action
+
+    @classmethod
+    def class_action_names(cls, **kwargs) -> Tuple[str, ...]:
+        return cls._actions
+
+    def close(self) -> None:
+        self.env.stop()
+
+    def _step(self, action: Union[int, Sequence[int]]) -> RLStepResult:
+
+        assert isinstance(action, int)
+        action = cast(int, action)
+
+        if action != self.task_info["missing_action"]:
+            action_str = self.action_names()[action]
+
+            if action_str == END:
+                self._took_end_action = True
+                self._success = self._is_goal_in_range()
+                self.last_action_success = self._success
+            elif action_str in [LOOK_UP, LOOK_DOWN]:
+                self.env.step({"action": action_str})
+                self.last_action_success = self.env.last_action_success
+            else:
+                self.env.step({"action": action_str})
+                self.last_action_success = self.env.last_action_success
+                pose = self.env.agent_state()
+                self.path.append({k: pose[k] for k in ["x", "y", "z"]})
+                self.task_info["followed_path"].append(pose)
+        else:
+            self.last_action_success = False
+            self.last_missing_action_made = True
+            self.num_missing_action_made += 1
+        self.num_action_made += 1
+
+        if len(self.path) > 1 and self.path[-1] != self.path[-2]:
+            self.num_moves_made += 1
+        step_result = RLStepResult(
+            observation=self.get_observations(),
+            reward=self.judge(),
+            done=self.is_done(),
+            info={"last_action_success": self.last_action_success, "action": action},
+        )
+
+        if False:
+            tgts = []
+            for i in range(10):
+                tgt = [self.task_info["target"]["x"], i * 0.1, self.task_info["target"]["z"]]
+                tgts.append(tgt)
+            tgts = torch.Tensor(tgts).unsqueeze(0)
+            tgts_2d = project_3d_points_to_2d([self.env.last_event.metadata], tgts)
+            tgts_2d = tgts_2d.squeeze(0).numpy()
+            tgts_2d = np.array([[y, x] for (x, y) in tgts_2d])
+
+            self.env.counter += 1
+            #method_name = "rgbd_kp_1xNPM"
+            method_name = "rgbd"
+            folder = "qualitative_results/{}/{}/{}".format(method_name,
+                                                           self.task_info["scene"],
+                                                           self.task_info["id"])
+            if not os.path.isdir("{}".format(folder)):
+                os.makedirs("{}".format(folder))
+            img = Image.fromarray(self.env.current_frame, "RGB")
+            img = draw_point(img, tgts_2d)
+            img.save("{}/{:05}.png".format(folder, self.env.counter))
+
+        return step_result
+
+    def render(self, mode: str = "rgb", *args, **kwargs) -> np.ndarray:
+        assert mode in ["rgb", "depth"], "only rgb and depth rendering is implemented"
+        if mode == "rgb":
+            return self.env.current_frame
+        elif mode == "depth":
+            return self.env.current_depth
+
+    def _is_goal_in_range(self) -> Optional[bool]:
+        tget = self.task_info["target"]
+        dist = self.dist_to_target()
+
+        if -0.5 < dist <= 0.2:
+            return True
+        elif dist > 0.2:
+            return False
+        else:
+            get_logger().debug(
+                "No path for {} from {} to {}".format(
+                    self.env.scene_name, self.env.agent_state(), tget
+                )
+            )
+            return None
+
+    def shaping(self) -> float:
+        rew = 0.0
+
+        if self.reward_configs["shaping_weight"] == 0.0:
+            return rew
+
+        geodesic_distance = self.dist_to_target()
+
+        if geodesic_distance == -1.0:
+            geodesic_distance = self.last_geodesic_distance
+        if (
+                self.last_geodesic_distance > -0.5 and geodesic_distance > -0.5
+        ):  # (robothor limits)
+            rew += self.last_geodesic_distance - geodesic_distance
+        self.last_geodesic_distance = geodesic_distance
+
+        return rew * self.reward_configs["shaping_weight"]
+
+    def shaping_by_missing_action(self, penalty) -> float:
+        if self.last_missing_action_made:
+            self.last_missing_action_made = False
+            return penalty
+        else:
+            return 0
+
+    def judge(self) -> float:
+        """Judge the last event."""
+        reward = self.reward_configs["step_penalty"]
+
+        reward += self.shaping()
+        if "missing_action_penalty" in self.reward_configs.keys():
+            reward += self.shaping_by_missing_action(self.reward_configs["missing_action_penalty"])
+
+        if self._took_end_action:
+            if self._success is not None:
+                reward += (
+                    self.reward_configs["goal_success_reward"]
+                    if self._success
+                    else self.reward_configs["failed_stop_reward"]
+                )
+
+        self._rewards.append(float(reward))
+        return float(reward)
+
+    def spl(self):
+        if not self._success:
+            return 0.0
+        li = self.optimal_distance
+        pi = self.num_moves_made * self.env._grid_size
+        res = li / (max(pi, li) + 1e-8)
+        return res
+
+    def dist_to_target(self):
+        return self.env.distance_to_point(self.task_info["target"])
+
+    def metrics(self) -> Dict[str, Any]:
+        if not self.is_done():
+            return {}
+
+        total_reward = float(np.sum(self._rewards))
+        self._rewards = []
+
+        if self._success is None:
+            return {}
+
+        dist2tget = self.dist_to_target()
+        spl = self.spl()
+
+        return {
+            **super(PointNavMissingActionTask, self).metrics(),
+            "success": self._success,  # False also if no path to target
+            "total_reward": total_reward,
+            "dist_to_target": dist2tget,
+            "spl": spl,
+            "target_in_reachable_points": self.last_tget_in_path,
+            "num_missing_action": self.num_missing_action_made,
+            "missing_action_ratio": self.num_missing_action_made / float(self.num_action_made),
+        }
+
+    def query_expert(self, end_action_only: bool = False, **kwargs) -> Tuple[int, bool]:
+        if self._is_goal_in_range():
+            return self.class_action_names().index(END), True
+        if end_action_only:
+            return 0, False
+        else:
+            raise NotImplementedError

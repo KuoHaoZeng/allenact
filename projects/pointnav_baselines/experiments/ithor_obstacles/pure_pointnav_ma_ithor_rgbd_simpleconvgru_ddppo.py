@@ -10,8 +10,8 @@ from plugins.ithor_plugin.ithor_sensors import (
     GPSCompassSensorIThor,
 )
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
-from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesMissingActionTask
-from projects.pointnav_baselines.experiments.ithor_obstacles.pointnav_ma_ithor_base import (
+from plugins.ithor_plugin.ithor_tasks import PointNavMissingActionTask
+from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_ma_ithor_base import (
     PointNaviThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
@@ -53,7 +53,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def tag(cls):
-        return "Pointnav-ma-iTHOR-RGBD-SimpleConv-DDPPO"
+        return "Pure-Pointnav-ma-iTHOR-RGBD-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
@@ -92,7 +92,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
         return PointNavActorCriticSimpleConvRNN(
-            action_space=gym.spaces.Discrete(len(PointNavObstaclesMissingActionTask.class_action_names())),
+            action_space=gym.spaces.Discrete(len(PointNavMissingActionTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",
             hidden_size=512,

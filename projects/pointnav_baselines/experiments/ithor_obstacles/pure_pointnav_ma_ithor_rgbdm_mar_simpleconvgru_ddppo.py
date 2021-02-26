@@ -5,17 +5,18 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from core.algorithms.onpolicy_sync.losses import PPO
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
+from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GPSCompassSensorIThor,
+    MissingActionSensor,
 )
-from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
-from plugins.ithor_plugin.ithor_tasks import PointNavObstaclesMissingActionTask
-from projects.pointnav_baselines.experiments.ithor_obstacles.pointnav_ma_ithor_base import (
+from plugins.ithor_plugin.ithor_tasks import PointNavMissingActionTask
+from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_ma_ithor_base import (
     PointNaviThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
-    PointNavActorCriticSimpleConvRNN,
+    PointNavMAActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
 
@@ -26,6 +27,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     def __init__(self):
         super().__init__()
+        self.REWARD_CONFIG["missing_action_penalty"] = -0.01
 
         self.SENSORS = [
             RGBSensorThor(
@@ -41,6 +43,10 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 uuid="depth",
             ),
             GPSCompassSensorIThor(),
+            MissingActionSensor(
+                nactions=len(PointNavMissingActionTask.class_action_names()),
+                uuid="missing_action"
+            ),
         ]
 
         self.PREPROCESSORS = []
@@ -49,11 +55,12 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             "rgb",
             "depth",
             "target_coordinates_ind",
+            "missing_action",
         ]
 
     @classmethod
     def tag(cls):
-        return "Pointnav-ma-iTHOR-RGBD-SimpleConv-DDPPO"
+        return "Pure-Pointnav-ma-iTHOR-RGBDM-MAReward-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
@@ -91,13 +98,15 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return PointNavActorCriticSimpleConvRNN(
-            action_space=gym.spaces.Discrete(len(PointNavObstaclesMissingActionTask.class_action_names())),
+        return PointNavMAActorCriticSimpleConvRNN(
+            action_space=gym.spaces.Discrete(len(PointNavMissingActionTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",
             hidden_size=512,
             embed_coordinates=False,
             coordinate_dims=2,
+            missing_action_embedding_dim=32,
+            missing_action_uuid="missing_action",
             num_rnn_layers=1,
             rnn_type="GRU",
         )
