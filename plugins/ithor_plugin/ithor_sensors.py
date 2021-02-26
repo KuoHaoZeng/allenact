@@ -474,3 +474,25 @@ class GlobalAgentPoseSensorThor(Sensor):
                       env.last_event.metadata["agent"]["rotation"]["y"],
                       0]
         return np.array(agent_pose, dtype=np.float32)
+
+class MissingActionSensor(Sensor):
+    def __init__(
+            self,
+            nactions: int,
+            uuid: str = "missing_action",
+            **kwargs: Any
+    ) -> None:
+        self.nactions = nactions
+        observation_space = self._get_observation_space()
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def _get_observation_space(self) -> gym.spaces.Tuple:
+        return gym.spaces.Discrete(self.nactions)
+
+
+    def get_observation(
+            self, env: IThorEnvironment, task: Optional[ObjectNavTask], *args: Any, **kwargs: Any
+    ) -> Any:
+        missing_action = task.task_info["missing_action"]
+        return missing_action

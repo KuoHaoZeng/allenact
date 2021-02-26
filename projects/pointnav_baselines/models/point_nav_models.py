@@ -407,6 +407,132 @@ class PointNavActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         return ac_output, memory.set_tensor("rnn", rnn_hidden_states)
 
 
+class PointNavMAActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
+    def __init__(
+            self,
+            action_space: gym.spaces.Discrete,
+            observation_space: SpaceDict,
+            goal_sensor_uuid: str,
+            hidden_size=512,
+            embed_coordinates=False,
+            coordinate_embedding_dim=8,
+            coordinate_dims=2,
+            missing_action_embedding_dim=32,
+            missing_action_uuid="missing_action",
+            num_rnn_layers=1,
+            rnn_type="GRU",
+    ):
+        super().__init__(action_space=action_space, observation_space=observation_space)
+
+        self.goal_sensor_uuid = goal_sensor_uuid
+        self.missing_action_uuid = missing_action_uuid
+        self._hidden_size = hidden_size
+        self.embed_coordinates = embed_coordinates
+        if self.embed_coordinates:
+            self.coorinate_embedding_size = coordinate_embedding_dim
+        else:
+            self.coorinate_embedding_size = coordinate_dims
+
+        self.sensor_fusion = False
+        if "rgb" in observation_space.spaces and "depth" in observation_space.spaces:
+            self.sensor_fuser = nn.Linear(hidden_size * 2, hidden_size)
+            self.sensor_fusion = True
+
+        self.visual_encoder = SimpleCNN(observation_space, hidden_size)
+
+        # Missing Action embedding
+        self.missing_action_embedding = nn.Embedding(
+            num_embeddings=action_space.n, embedding_dim=missing_action_embedding_dim
+        )
+
+        self.state_encoder = RNNStateEncoder(
+            (0 if self.is_blind else self.recurrent_hidden_state_size)
+            + self.coorinate_embedding_size + missing_action_embedding_dim,
+            self._hidden_size,
+            num_layers=num_rnn_layers,
+            rnn_type=rnn_type,
+            )
+
+        self.actor = LinearActorHead(self._hidden_size, action_space.n)
+        self.critic = LinearCriticHead(self._hidden_size)
+
+        if self.embed_coordinates:
+            self.coordinate_embedding = nn.Linear(
+                coordinate_dims, coordinate_embedding_dim
+            )
+
+        self.train()
+
+    @property
+    def output_size(self):
+        return self._hidden_size
+
+    @property
+    def is_blind(self):
+        return self.visual_encoder.is_blind
+
+    @property
+    def num_recurrent_layers(self):
+        return self.state_encoder.num_recurrent_layers
+
+    def get_target_coordinates_encoding(self, observations):
+        if self.embed_coordinates:
+            return self.coordinate_embedding(
+                observations[self.goal_sensor_uuid].to(torch.float32)
+            )
+        else:
+            return observations[self.goal_sensor_uuid].to(torch.float32)
+
+    def get_missing_action_embedding(self, observations):
+        return self.missing_action_embedding(observations[self.missing_action_uuid].to(torch.int64))
+
+    @property
+    def recurrent_hidden_state_size(self):
+        return self._hidden_size
+
+    def _recurrent_memory_specification(self):
+        return dict(
+            rnn=(
+                (
+                    ("layer", self.num_recurrent_layers),
+                    ("sampler", None),
+                    ("hidden", self.recurrent_hidden_state_size),
+                ),
+                torch.float32,
+            )
+        )
+
+    def forward(  # type:ignore
+            self,
+            observations: ObservationType,
+            memory: Memory,
+            prev_actions: torch.Tensor,
+            masks: torch.FloatTensor,
+            current_actions: torch.FloatTensor = None,
+    ) -> Tuple[ActorCriticOutput[DistributionType], Optional[Memory]]:
+        target_encoding = self.get_target_coordinates_encoding(observations)
+        x: Union[torch.Tensor, List[torch.Tensor]]
+        x = [target_encoding]
+
+        if not self.is_blind:
+            perception_embed = self.visual_encoder(observations)
+            if self.sensor_fusion:
+                perception_embed = self.sensor_fuser(perception_embed)
+            x = [perception_embed] + x
+
+        missing_action_feat = self.get_missing_action_embedding(observations)
+        x = [missing_action_feat] + x
+
+        x = torch.cat(x, dim=-1)
+        x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
+
+        ac_output = ActorCriticOutput(
+            distributions=self.actor(x), values=self.critic(x), extras={}
+        )
+
+        return ac_output, memory.set_tensor("rnn", rnn_hidden_states)
+
+
 class PointNavPBLActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
     def __init__(
             self,
