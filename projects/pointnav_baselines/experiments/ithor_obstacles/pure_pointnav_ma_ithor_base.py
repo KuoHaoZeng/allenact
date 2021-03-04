@@ -38,10 +38,10 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
         self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
 
         self.TRAIN_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles-missing-action_1episode/train"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles-missing-action/train"
         )
         self.VAL_DATASET_DIR = os.path.join(
-            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles-missing-action_1episode/test"
+            ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles-missing-action/test"
         )
 
         self.TARGET_TYPES = None

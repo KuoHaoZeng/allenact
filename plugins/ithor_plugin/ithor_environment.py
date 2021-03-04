@@ -116,6 +116,9 @@ class IThorEnvironment(object):
 
         self.distance_cache = DynamicDistanceCache(rounding=1)
 
+        self.last_frame_cache = None
+        self.last_depth_cache = None
+
         self.counter = 0
         if os.path.isfile(mask_rcnn_dir):
             gpu_id = int(x_display.split(".")[-1])
@@ -143,6 +146,18 @@ class IThorEnvironment(object):
     def current_depth(self) -> np.ndarray:
         """Returns depth image corresponding to the agent's egocentric view."""
         return np.expand_dims(self.controller.last_event.depth_frame, axis=2)
+
+    @property
+    def last_frame(self) -> np.ndarray:
+        if isinstance(self.last_frame_cache, type(None)):
+            self.last_frame_cache = self.current_frame
+        return self.last_frame_cache
+
+    @property
+    def last_depth(self) -> np.ndarray:
+        if isinstance(self.last_depth_cache, type(None)):
+            self.last_depth_cache = self.current_depth
+        return self.last_depth_cache
 
     @property
     def current_instance_segmentation_frame(self) -> np.ndarray:
@@ -944,6 +959,9 @@ class IThorEnvironment(object):
         if skip_render:
             assert last_frame is not None
             self.last_event.frame = last_frame
+
+        self.last_frame_cache = self.current_frame.copy()
+        self.last_depth_cache = self.current_depth.copy()
 
         return sr
 

@@ -24,6 +24,17 @@ class RGBSensorThor(RGBSensor[IThorEnvironment, Task[IThorEnvironment]]):
         return env.current_frame.copy()
 
 
+class LastRGBSensorThor(RGBSensor[IThorEnvironment, Task[IThorEnvironment]]):
+    """Sensor for RGB images in iTHOR.
+
+    Returns from a running IThorEnvironment instance, the current RGB
+    frame corresponding to the agent's egocentric view.
+    """
+
+    def frame_from_env(self, env: IThorEnvironment) -> np.ndarray:
+        return env.last_frame.copy()
+
+
 class GoalObjectTypeThorSensor(Sensor):
     def __init__(
         self,
@@ -181,6 +192,36 @@ class DepthSensorIThor(DepthSensor[IThorEnvironment, Task[IThorEnvironment]]):
         return env.current_depth.copy()
 
 
+class LastDepthSensorIThor(DepthSensor[IThorEnvironment, Task[IThorEnvironment]]):
+    # For backwards compatibility
+    def __init__(
+            self,
+            use_resnet_normalization: Optional[bool] = None,
+            use_normalization: Optional[bool] = None,
+            mean: Optional[np.ndarray] = np.array([[0.5]], dtype=np.float32),
+            stdev: Optional[np.ndarray] = np.array([[0.25]], dtype=np.float32),
+            height: Optional[int] = None,
+            width: Optional[int] = None,
+            uuid: str = "depth",
+            output_shape: Optional[Tuple[int, ...]] = None,
+            output_channels: int = 1,
+            unnormalized_infimum: float = 0.0,
+            unnormalized_supremum: float = 5.0,
+            scale_first: bool = False,
+            **kwargs: Any
+    ):
+        # Give priority to use_normalization, but use_resnet_normalization for backward compat. if not set
+        if use_resnet_normalization is not None and use_normalization is None:
+            use_normalization = use_resnet_normalization
+        elif use_normalization is None:
+            use_normalization = False
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def frame_from_env(self, env: IThorEnvironment) -> np.ndarray:
+        return env.last_depth.copy()
+
+
 class FrameSensorThor(Sensor):
     """Sensor for Class Segmentation in iTHOR.
 
@@ -236,7 +277,19 @@ class ClassSegmentationSensorThor(Sensor):
             *args: Any,
             **kwargs: Any
     ) -> Any:
-        return env.get_masks_by_object_types(self.objectTypes).copy()
+        if isinstance(env.mask_rcnn_model, type(None)):
+            return env.get_masks_by_object_types(self.objectTypes).copy()
+        else:
+            output = env.get_mask_rcnn_result()
+            labels = list(output["labels"].detach().cpu().numpy())
+            masks = output["masks"].squeeze(1).detach().cpu().numpy()
+            mask = np.ones((env.current_frame.shape[0], env.current_frame.shape[0])) * len(self.objectTypes)
+            for idx, mask_rcnn_label in enumerate(labels):
+                tmp = masks[idx]
+                mask[np.where(tmp)] = mask_rcnn_label
+            mask = mask.astype(np.float32)
+            mask /= len(self.objectTypes)
+            return np.expand_dims(mask, axis=2)
 
 
 class LocalKeyPoints3DSensorThor(Sensor):
