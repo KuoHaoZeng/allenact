@@ -202,7 +202,7 @@ class LastDepthSensorIThor(DepthSensor[IThorEnvironment, Task[IThorEnvironment]]
             stdev: Optional[np.ndarray] = np.array([[0.25]], dtype=np.float32),
             height: Optional[int] = None,
             width: Optional[int] = None,
-            uuid: str = "depth",
+            uuid: str = "last_depth",
             output_shape: Optional[Tuple[int, ...]] = None,
             output_channels: int = 1,
             unnormalized_infimum: float = 0.0,
@@ -549,3 +549,28 @@ class MissingActionSensor(Sensor):
     ) -> Any:
         missing_action = task.task_info["missing_action"]
         return missing_action
+
+class MissingActionVectorSensor(Sensor):
+    def __init__(
+            self,
+            nactions: int,
+            uuid: str = "missing_action",
+            **kwargs: Any
+    ) -> None:
+        self.nactions = nactions
+        observation_space = self._get_observation_space()
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def _get_observation_space(self) -> gym.spaces.Tuple:
+        return gym.spaces.Discrete(self.nactions)
+
+
+    def get_observation(
+            self, env: IThorEnvironment, task: Optional[ObjectNavTask], *args: Any, **kwargs: Any
+    ) -> Any:
+        missing_action = task.task_info["missing_action"]
+        out = np.zeros(self.nactions)
+        for ma in missing_action:
+            out[ma] = 1
+        return out

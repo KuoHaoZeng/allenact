@@ -1267,7 +1267,7 @@ class PointNavMissingActionTask(Task[IThorEnvironment]):
         assert isinstance(action, int)
         action = cast(int, action)
 
-        if action != self.task_info["missing_action"]:
+        if action not in self.task_info["missing_action"]:
             action_str = self.action_names()[action]
 
             if action_str == END:

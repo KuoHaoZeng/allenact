@@ -1294,7 +1294,7 @@ class PointNavMissingActionDatasetTaskSampler(TaskSampler):
         for k in ["initial_position", "initial_orientation", "target_position"]:
             episode[k] = to_pos(episode[k])
 
-        missing_action = random.choice([0, 1, 2, 3])
+        missing_action = [random.choice([0, 1, 2, 3])]
 
         task_info = {
             "scene": scene,
