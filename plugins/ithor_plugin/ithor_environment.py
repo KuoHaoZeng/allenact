@@ -898,6 +898,9 @@ class IThorEnvironment(object):
         if self.simplify_physics:
             action_dict["simplifyOPhysics"] = True
 
+        self.last_frame_cache = self.current_frame.copy()
+        self.last_depth_cache = self.current_depth.copy()
+
         if "Move" in action and "Hand" not in action:  # type: ignore
             action_dict = {
                 **action_dict,
@@ -959,9 +962,6 @@ class IThorEnvironment(object):
         if skip_render:
             assert last_frame is not None
             self.last_event.frame = last_frame
-
-        self.last_frame_cache = self.current_frame.copy()
-        self.last_depth_cache = self.current_depth.copy()
 
         return sr
 

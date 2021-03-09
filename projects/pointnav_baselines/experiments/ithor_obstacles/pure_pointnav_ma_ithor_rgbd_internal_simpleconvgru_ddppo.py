@@ -12,6 +12,7 @@ from plugins.ithor_plugin.ithor_sensors import (
     LastRGBSensorThor,
     LastDepthSensorIThor,
     MissingActionVectorSensor,
+    MissingActionVectorMaskSensor,
 )
 from plugins.ithor_plugin.ithor_tasks import PointNavMissingActionTask
 from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_ma_ithor_base import (
@@ -60,6 +61,9 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 nactions=len(PointNavMissingActionTask.class_action_names()),
                 uuid="missing_action"
             ),
+            MissingActionVectorMaskSensor(
+                uuid="missing_action_mask"
+            )
         ]
 
         self.PREPROCESSORS = []
@@ -71,6 +75,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             "last_rgb",
             "last_depth",
             "missing_action",
+            "missing_action_mask",
         ]
 
     @classmethod

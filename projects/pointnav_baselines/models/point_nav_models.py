@@ -574,6 +574,7 @@ class PointNavMAInternalActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDis
             rnn_type=rnn_type,
         )
         self.intenral_model_classifier = nn.Linear(missing_action_embedding_dim, action_space.n)
+        self.intenral_crippled_action_embedding = nn.Linear(action_space.n, missing_action_embedding_dim * 4)
 
         # Missing Action embedding
         self.missing_action_embedding = nn.Embedding(
@@ -582,7 +583,7 @@ class PointNavMAInternalActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDis
 
         self.state_encoder = RNNStateEncoder(
             (0 if self.is_blind else self.recurrent_hidden_state_size)
-            + self.coorinate_embedding_size + missing_action_embedding_dim,
+            + self.coorinate_embedding_size + missing_action_embedding_dim * 4,
             self._hidden_size,
             num_layers=num_rnn_layers,
             rnn_type=rnn_type,
@@ -648,7 +649,7 @@ class PointNavMAInternalActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDis
                     ("hidden", self.missing_action_embedding_dim),
                 ),
                 torch.float32,
-            )
+            ),
         )
 
     def forward(  # type:ignore
@@ -677,7 +678,10 @@ class PointNavMAInternalActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDis
         internal_feat, internal_model_states = self.internal_model(internal_x, memory.tensor("internal"), masks)
         internal_output = self.intenral_model_classifier(internal_feat)
 
-        x = [internal_feat] + x
+        crippled_action_feature = self.intenral_crippled_action_embedding(internal_output.detach())
+
+        #x = [internal_feat] + x
+        x = [crippled_action_feature] + x
 
         x = torch.cat(x, dim=-1)
         x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
@@ -689,7 +693,10 @@ class PointNavMAInternalActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDis
         if not isinstance(current_actions, type(None)):
             out = {"ac_output": out, "internal_output": internal_output, "internal_prev_actions": prev_actions}
 
-        return out, memory.set_tensor("rnn", rnn_hidden_states).set_tensor("internal", internal_model_states)
+        memory = memory.set_tensor("rnn", rnn_hidden_states)
+        memory = memory.set_tensor("internal", internal_model_states)
+
+        return out, memory
 
 
 class PointNavPBLActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):

@@ -51,15 +51,19 @@ class MA_loss(AbstractActorCriticLoss):
         internal_out = actor_critic_output[self.internal_uuid]
         prev_actions = actor_critic_output[self.prev_action_uuid]
         internal_gt = batch["observations"]["missing_action"]
+        #internal_gt_mask = batch["observations"]["missing_action_mask"]
 
         nt, ng = internal_out.shape[0], internal_out.shape[1]
         prev_actions = prev_actions.view(nt * ng)
         internal_out = internal_out.view(nt * ng, -1)[torch.arange(nt * ng), prev_actions]
         internal_gt = internal_gt.view(nt * ng, -1)[torch.arange(nt * ng), prev_actions]
         masks = batch["masks"].view(nt * ng)
+        #internal_gt_mask = internal_gt_mask.view(nt * ng)
 
         loss = torch.nn.functional.binary_cross_entropy_with_logits(internal_out, internal_gt, reduce=False)
         loss = (loss * masks).sum() / masks.sum()
+        #loss = (loss * masks * internal_gt_mask).sum() / (masks * internal_gt_mask).sum()
+        loss = loss
 
         return (
             loss,

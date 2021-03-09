@@ -1247,6 +1247,7 @@ class PointNavMissingActionTask(Task[IThorEnvironment]):
         self.last_missing_action_made = False
         self.num_missing_action_made = 0
         self.num_action_made = 0
+        self.missing_action_mask = 0
 
     @property
     def action_space(self):
@@ -1267,6 +1268,7 @@ class PointNavMissingActionTask(Task[IThorEnvironment]):
         assert isinstance(action, int)
         action = cast(int, action)
 
+        self.missing_action_mask = 1
         if action not in self.task_info["missing_action"]:
             action_str = self.action_names()[action]
 
