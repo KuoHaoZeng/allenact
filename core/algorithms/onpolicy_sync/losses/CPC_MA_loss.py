@@ -73,5 +73,5 @@ class CPC_MA_loss(AbstractActorCriticLoss):
 
         return (
             loss,
-            {"CPC_loss": loss.item(),},
+            {"CPC_loss": loss.item() / 2,},
         )

@@ -104,9 +104,9 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             max_grad_norm=max_grad_norm,
             num_steps=num_steps,
             named_losses={"ppo_loss": PPO(**PPOConfig),
-                          "CMA_loss": CMA_loss(internal_positive_uuid="internal_output_positive",
-                                               internal_negative_uuid="internal_output_negative",
-                                               prev_action_uuid="internal_prev_actions"),
+                          "MA_loss": CMA_loss(internal_positive_uuid="internal_output_positive",
+                                              internal_negative_uuid="internal_output_negative",
+                                              prev_action_uuid="internal_prev_actions"),
                           "CPC_MA_loss": CPC_MA_loss(positive_uuid="logit_positive",
                                                      negative_uuid="logit_negative",
                                                      prev_action_uuid="internal_prev_actions")},
@@ -115,7 +115,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss", "CMA_loss", "CPC_MA_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "MA_loss", "CPC_MA_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}

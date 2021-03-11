@@ -74,5 +74,5 @@ class CMA_loss(AbstractActorCriticLoss):
 
         return (
             loss,
-            {"MA_loss": loss.item(),},
+            {"MA_loss": loss.item() / 2,},
         )
