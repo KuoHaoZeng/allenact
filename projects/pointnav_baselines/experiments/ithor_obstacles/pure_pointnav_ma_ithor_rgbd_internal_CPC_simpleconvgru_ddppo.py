@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO, MA_loss
+from core.algorithms.onpolicy_sync.losses import PPO, CMA_loss, CPC_MA_loss
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
@@ -19,7 +19,7 @@ from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_ma_it
     PointNaviThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
-    PointNavMAInternalActorCriticSimpleConvRNN,
+    PointNavMAInternalCPCActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
 
@@ -104,14 +104,18 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             max_grad_norm=max_grad_norm,
             num_steps=num_steps,
             named_losses={"ppo_loss": PPO(**PPOConfig),
-                          "MA_loss": MA_loss(internal_uuid="internal_output",
-                                             prev_action_uuid="internal_prev_actions")},
+                          "CMA_loss": CMA_loss(internal_positive_uuid="internal_output_positive",
+                                               internal_negative_uuid="internal_output_negative",
+                                               prev_action_uuid="internal_prev_actions"),
+                          "CPC_MA_loss": CPC_MA_loss(positive_uuid="logit_positive",
+                                                     negative_uuid="logit_negative",
+                                                     prev_action_uuid="internal_prev_actions")},
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss", "MA_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss", "CMA_loss", "CPC_MA_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
@@ -120,7 +124,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return PointNavMAInternalActorCriticSimpleConvRNN(
+        return PointNavMAInternalCPCActorCriticSimpleConvRNN(
             action_space=gym.spaces.Discrete(len(PointNavMissingActionTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",

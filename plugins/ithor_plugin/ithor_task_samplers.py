@@ -10,7 +10,7 @@ from core.base_abstractions.sensor import Sensor
 from core.base_abstractions.task import TaskSampler
 from plugins.ithor_plugin.ithor_environment import IThorEnvironment
 from plugins.ithor_plugin.ithor_tasks import ObjectNavTask, PointNavTask, PointNavObstaclesTask, PlacementTask,\
-    PointNavObstaclesMissingActionTask, PointNavMissingActionTask
+    PointNavObstaclesMissingActionTask, PointNavMissingActionTask, PointNavDynamicsCorruptionTask
 from utils.cache_utils import str_to_pos_for_cache
 from utils.experiment_utils import set_deterministic_cudnn, set_seed
 from utils.system import get_logger
@@ -1325,6 +1325,211 @@ class PointNavMissingActionDatasetTaskSampler(TaskSampler):
         self.env.initialize(0.25, renderObjectImage=True, renderDepthImage=True)
 
         self._last_sampled_task = PointNavMissingActionTask(
+            env=self.env,
+            sensors=self.sensors,
+            task_info=task_info,
+            max_steps=self.max_steps,
+            action_space=self._action_space,
+            reward_configs=self.rewards_config,
+        )
+
+        return self._last_sampled_task
+
+    def reset(self):
+        self.episode_index = 0
+        self.scene_index = 0
+        self.max_tasks = self.reset_tasks
+
+    def set_seed(self, seed: int):
+        self.seed = seed
+        if seed is not None:
+            set_seed(seed)
+
+    @property
+    def length(self) -> Union[int, float]:
+        """Length.
+
+        # Returns
+
+        Number of total tasks remaining that can be sampled.
+        Can be float('inf').
+        """
+        return float("inf") if self.max_tasks is None else self.max_tasks
+
+
+class PointNavDynamicsCorruptionDatasetTaskSampler(TaskSampler):
+    def __init__(
+            self,
+            scenes: List[str],
+            scene_directory: str,
+            sensors: List[Sensor],
+            max_steps: int,
+            env_args: Dict[str, Any],
+            action_space: gym.Space,
+            rewards_config: Dict,
+            seed: Optional[int] = None,
+            deterministic_cudnn: bool = False,
+            loop_dataset: bool = True,
+            shuffle_dataset: bool = True,
+            allow_flipping=False,
+            env_class=IThorEnvironment,
+            **kwargs,
+    ) -> None:
+        self.rewards_config = rewards_config
+        self.env_args = env_args
+        self.scenes = scenes
+        self.shuffle_dataset: bool = shuffle_dataset
+        self.episodes = {
+            scene: ObjectNavDatasetTaskSampler.load_dataset(
+                scene, scene_directory + "/episodes"
+            )
+            for scene in scenes
+        }
+        self.env_class = env_class
+        self.env: Optional[IThorEnvironment] = None
+        self.sensors = sensors
+        self.max_steps = max_steps
+        self._action_space = action_space
+        self.allow_flipping = allow_flipping
+        self.scene_counter: Optional[int] = None
+        self.scene_order: Optional[List[str]] = None
+        self.scene_id: Optional[int] = None
+        # get the total number of tasks assigned to this process
+        if loop_dataset:
+            self.max_tasks = None
+        else:
+            self.max_tasks = sum(len(self.episodes[scene]) for scene in self.episodes)
+        self.reset_tasks = self.max_tasks
+        self.scene_index = 0
+        self.episode_index = 0
+
+        self._last_sampled_task: Optional[PointNavDynamicsCorruptionTask] = None
+
+        self.seed: Optional[int] = None
+        self.set_seed(seed)
+
+        if deterministic_cudnn:
+            set_deterministic_cudnn()
+
+        self.reset()
+
+    def _create_environment(self) -> IThorEnvironment:
+        env = self.env_class(**self.env_args)
+        return env
+
+    @property
+    def __len__(self) -> Union[int, float]:
+        """Length.
+
+        # Returns
+
+        Number of total tasks remaining that can be sampled. Can be float('inf').
+        """
+        return float("inf") if self.max_tasks is None else self.max_tasks
+
+    @property
+    def total_unique(self) -> Optional[Union[int, float]]:
+        return self.reset_tasks
+
+    @property
+    def last_sampled_task(self) -> Optional[PointNavDynamicsCorruptionTask]:
+        return self._last_sampled_task
+
+    def close(self) -> None:
+        if self.env is not None:
+            self.env.stop()
+
+    @property
+    def all_observation_spaces_equal(self) -> bool:
+        """Check if observation spaces equal.
+
+        # Returns
+
+        True if all Tasks that can be sampled by this sampler have the
+            same observation space. Otherwise False.
+        """
+        return True
+
+    def next_task(self, force_advance_scene: bool = False) -> Optional[PointNavDynamicsCorruptionTask]:
+        if self.max_tasks is not None and self.max_tasks <= 0:
+            return None
+
+        if self.episode_index >= len(self.episodes[self.scenes[self.scene_index]]):
+            self.scene_index = (self.scene_index + 1) % len(self.scenes)
+            # shuffle the new list of episodes to train on
+            if self.shuffle_dataset:
+                random.shuffle(self.episodes[self.scenes[self.scene_index]])
+            self.episode_index = 0
+
+        scene = self.scenes[self.scene_index]
+        episode = self.episodes[scene][self.episode_index]
+        if self.env is not None:
+            #if scene.replace("_physics", "") != self.env.scene_name.replace(
+            #        "_physics", ""
+            #):
+            self.env.reset(scene_name=scene, move_mag=self.env._move_mag, filtered_objects=[])
+        else:
+            self.env = self._create_environment()
+            self.env.reset(scene_name=scene, move_mag=self.env._move_mag, filtered_objects=[])
+
+        def to_pos(s):
+            if isinstance(s, (Dict, Tuple)):
+                return s
+            if isinstance(s, float):
+                return {"x": 0, "y": s, "z": 0}
+            return str_to_pos_for_cache(s)
+
+        for k in ["initial_position", "initial_orientation", "target_position"]:
+            episode[k] = to_pos(episode[k])
+
+        missing_action = [random.choice([0, 1, 2, 3, 7])]
+        if missing_action[0] == 0 or missing_action[0] == 1:
+            move_mag = random.choice([0.25, 0.5, 0.75])
+            if move_mag == 0.25:
+                move_rot_deg = random.choice([-1.15, 1.15])
+            else:
+                move_rot_deg = random.choice([-1.15, 0, 1.15])
+        else:
+            move_mag = 0.25
+            move_rot_deg = 0
+
+        if missing_action[0] == 2 or missing_action[0] == 3:
+            rot_deg = random.choice([0, 20, 40])
+        else:
+            rot_deg = 30
+
+        task_info = {
+            "scene": scene,
+            "initial_position": episode["initial_position"],
+            "initial_orientation": episode["initial_orientation"],
+            "target": episode["target_position"],
+            "shortest_path": episode["shortest_path"],
+            "distance_to_target": episode["shortest_path_length"],
+            "id": episode["id"],
+            "obstacles_types": episode["obstacles_types"],
+            "missing_action": missing_action,
+            "move_mag": move_mag,
+            "move_rot_deg": move_rot_deg,
+            "rot_deg": rot_deg,
+        }
+
+        if self.allow_flipping and random.random() > 0.5:
+            task_info["mirrored"] = True
+        else:
+            task_info["mirrored"] = False
+
+        self.episode_index += 1
+        if self.max_tasks is not None:
+            self.max_tasks -= 1
+
+        if not self.env.teleport(
+                pose=episode["initial_position"], rotation=episode["initial_orientation"]
+        ):
+            return self.next_task()
+
+        self.env.initialize(0.25, renderObjectImage=True, renderDepthImage=True)
+
+        self._last_sampled_task = PointNavDynamicsCorruptionTask(
             env=self.env,
             sensors=self.sensors,
             task_info=task_info,

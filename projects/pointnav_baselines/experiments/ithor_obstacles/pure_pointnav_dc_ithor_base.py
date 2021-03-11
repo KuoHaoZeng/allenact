@@ -11,8 +11,8 @@ import torch
 from constants import ABS_PATH_OF_TOP_LEVEL_DIR
 from core.base_abstractions.preprocessor import ObservationSet
 from core.base_abstractions.task import TaskSampler
-from plugins.ithor_plugin.ithor_task_samplers import PointNavMissingActionDatasetTaskSampler
-from plugins.ithor_plugin.ithor_tasks import PointNavMissingActionTask
+from plugins.ithor_plugin.ithor_task_samplers import PointNavDynamicsCorruptionDatasetTaskSampler
+from plugins.ithor_plugin.ithor_tasks import PointNavDynamicsCorruptionTask
 from projects.objectnav_baselines.experiments.objectnav_base import ObjectNavBaseConfig
 from utils.experiment_utils import Builder
 
@@ -27,6 +27,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
         self.ENV_ARGS = dict(
             player_screen_width=self.SCREEN_SIZE,
             player_screen_height=self.SCREEN_SIZE,
+            grid_size=0.25,
             #mask_rcnn_dir="storage/maskRcnn/model_9.pth"
             #local_thor_build="/home/khzeng/exp/NPM/src/ai2thor/unity/builds/thor-local-Linux64",
         )
@@ -112,7 +113,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
 
     @classmethod
     def make_sampler_fn(cls, **kwargs) -> TaskSampler:
-        return PointNavMissingActionDatasetTaskSampler(**kwargs)
+        return PointNavDynamicsCorruptionDatasetTaskSampler(**kwargs)
 
     @staticmethod
     def _partition_inds(n: int, num_parts: int):
@@ -161,7 +162,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
             "max_steps": self.MAX_STEPS,
             "sensors": self.SENSORS,
             "action_space": gym.spaces.Discrete(
-                len(PointNavMissingActionTask.class_action_names())
+                len(PointNavDynamicsCorruptionTask.class_action_names())
             ),
             "seed": seeds[process_ind] if seeds is not None else None,
             "deterministic_cudnn": deterministic_cudnn,

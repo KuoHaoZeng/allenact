@@ -3,23 +3,20 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 
-from core.algorithms.onpolicy_sync.losses import PPO, MA_loss
+from core.algorithms.onpolicy_sync.losses import PPO
 from core.algorithms.onpolicy_sync.losses.ppo import PPOConfig
+from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
 from plugins.ithor_plugin.ithor_sensors import (
     DepthSensorIThor,
     GPSCompassSensorIThor,
-    LastRGBSensorThor,
-    LastDepthSensorIThor,
-    MissingActionVectorSensor,
-    MissingActionVectorMaskSensor,
+    MissingActionSensor,
 )
-from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
-from plugins.ithor_plugin.ithor_tasks import PointNavMissingActionTask
-from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_ma_ithor_base import (
+from plugins.ithor_plugin.ithor_tasks import PointNavDynamicsCorruptionTask
+from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_dc_ithor_base import (
     PointNaviThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
-    PointNavMAInternalActorCriticSimpleConvRNN,
+    PointNavMAActorCriticSimpleConvRNN,
 )
 from utils.experiment_utils import Builder, PipelineStage, TrainingPipeline, LinearDecay
 
@@ -45,25 +42,10 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 uuid="depth",
             ),
             GPSCompassSensorIThor(),
-            LastRGBSensorThor(
-                height=self.SCREEN_SIZE,
-                width=self.SCREEN_SIZE,
-                use_resnet_normalization=True,
-                uuid="last_rgb",
-            ),
-            LastDepthSensorIThor(
-                height=self.SCREEN_SIZE,
-                width=self.SCREEN_SIZE,
-                use_normalization=True,
-                uuid="last_depth",
-            ),
-            MissingActionVectorSensor(
-                nactions=len(PointNavMissingActionTask.class_action_names()),
+            MissingActionSensor(
+                nactions=len(PointNavDynamicsCorruptionTask.class_action_names()),
                 uuid="missing_action"
             ),
-            MissingActionVectorMaskSensor(
-                uuid="missing_action_mask"
-            )
         ]
 
         self.PREPROCESSORS = []
@@ -72,24 +54,21 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             "rgb",
             "depth",
             "target_coordinates_ind",
-            "last_rgb",
-            "last_depth",
             "missing_action",
-            "missing_action_mask",
         ]
 
     @classmethod
     def tag(cls):
-        return "Pure-Pointnav-ma-iTHOR-RGBD-Internal-SimpleConv-DDPPO"
+        return "Pure-Pointnav-dc-iTHOR-RGBDM-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(10000000)
+        ppo_steps = int(40000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
         num_steps = 30
-        save_interval = 1000000
+        save_interval = 5000000
         log_interval = 100
         gamma = 0.99
         use_gae = True
@@ -103,15 +82,13 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
             update_repeats=update_repeats,
             max_grad_norm=max_grad_norm,
             num_steps=num_steps,
-            named_losses={"ppo_loss": PPO(**PPOConfig),
-                          "MA_loss": MA_loss(internal_uuid="internal_output",
-                                             prev_action_uuid="internal_prev_actions")},
+            named_losses={"ppo_loss": PPO(**PPOConfig)},
             gamma=gamma,
             use_gae=use_gae,
             gae_lambda=gae_lambda,
             advance_scene_rollout_period=cls.ADVANCE_SCENE_ROLLOUT_PERIOD,
             pipeline_stages=[
-                PipelineStage(loss_names=["ppo_loss", "MA_loss"], max_stage_steps=ppo_steps)
+                PipelineStage(loss_names=["ppo_loss"], max_stage_steps=ppo_steps)
             ],
             lr_scheduler_builder=Builder(
                 LambdaLR, {"lr_lambda": LinearDecay(steps=ppo_steps)}
@@ -120,8 +97,8 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
-        return PointNavMAInternalActorCriticSimpleConvRNN(
-            action_space=gym.spaces.Discrete(len(PointNavMissingActionTask.class_action_names())),
+        return PointNavMAActorCriticSimpleConvRNN(
+            action_space=gym.spaces.Discrete(len(PointNavDynamicsCorruptionTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",
             hidden_size=512,

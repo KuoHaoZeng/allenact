@@ -57,6 +57,7 @@ class IThorEnvironment(object):
         object_open_speed: float = 1.0,
         simplify_physics: bool = False,
         mask_rcnn_dir: str = "",
+        grid_size: float = 0.25,
     ) -> None:
         """Initializer.
 
@@ -110,7 +111,7 @@ class IThorEnvironment(object):
         self._always_return_visible_range = False
         self.simplify_physics = simplify_physics
 
-        self.start(None)
+        self.start(None, move_mag=grid_size)
         # noinspection PyTypeHints
         self.controller.docker_enabled = docker_enabled  # type: ignore
 
@@ -901,7 +902,28 @@ class IThorEnvironment(object):
         self.last_frame_cache = self.current_frame.copy()
         self.last_depth_cache = self.current_depth.copy()
 
-        if "Move" in action and "Hand" not in action:  # type: ignore
+        if "moveMagnitude" in action_dict.keys() and "objectId" not in action_dict.keys():
+            if "degrees" in action_dict.keys():
+                drift_action_dict = {"action": "RotateRight",
+                               "degrees": action_dict["degrees"]}
+                _ = self.controller.step(drift_action_dict)
+            action_dict = {"action": action,
+                           "moveMagnitude": action_dict["moveMagnitude"]}
+            start_location = self.get_agent_location()
+            sr = self.controller.step(action_dict)
+
+            if self.restrict_to_initially_reachable_points:
+                end_location_tuple = self._agent_location_to_tuple(
+                    self.get_agent_location()
+                )
+                if end_location_tuple not in self.initially_reachable_points_set:
+                    self.teleport_agent_to(**start_location, force_action=True)  # type: ignore
+                    self.last_action = action
+                    self.last_action_success = False
+                    self.last_event.metadata[
+                        "errorMessage"
+                    ] = "Moved to location outside of initially reachable points."
+        elif "Move" in action and "Hand" not in action:  # type: ignore
             action_dict = {
                 **action_dict,
                 "moveMagnitude": self._move_mag,

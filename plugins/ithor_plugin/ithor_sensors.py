@@ -541,7 +541,7 @@ class MissingActionSensor(Sensor):
         super().__init__(**prepare_locals_for_super(locals()))
 
     def _get_observation_space(self) -> gym.spaces.Tuple:
-        return gym.spaces.Discrete(self.nactions)
+        return gym.spaces.Discrete(self.nactions + 1)
 
 
     def get_observation(
@@ -563,13 +563,13 @@ class MissingActionVectorSensor(Sensor):
         super().__init__(**prepare_locals_for_super(locals()))
 
     def _get_observation_space(self) -> gym.spaces.Tuple:
-        return gym.spaces.Discrete(self.nactions)
+        return gym.spaces.Discrete(self.nactions + 1)
 
     def get_observation(
             self, env: IThorEnvironment, task: Optional[ObjectNavTask], *args: Any, **kwargs: Any
     ) -> Any:
         missing_action = task.task_info["missing_action"]
-        out = np.zeros(self.nactions)
+        out = np.zeros(self.nactions + 1)
         for ma in missing_action:
             out[ma] = 1
         return out

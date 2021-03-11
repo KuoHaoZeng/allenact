@@ -14,8 +14,8 @@ from plugins.ithor_plugin.ithor_sensors import (
     MissingActionVectorMaskSensor,
 )
 from plugins.ithor_plugin.ithor_sensors import RGBSensorThor
-from plugins.ithor_plugin.ithor_tasks import PointNavMissingActionTask
-from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_ma_ithor_base import (
+from plugins.ithor_plugin.ithor_tasks import PointNavDynamicsCorruptionTask
+from projects.pointnav_baselines.experiments.ithor_obstacles.pure_pointnav_dc_ithor_base import (
     PointNaviThorBaseConfig,
 )
 from projects.pointnav_baselines.models.point_nav_models import (
@@ -58,7 +58,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
                 uuid="last_depth",
             ),
             MissingActionVectorSensor(
-                nactions=len(PointNavMissingActionTask.class_action_names()),
+                nactions=len(PointNavDynamicsCorruptionTask.class_action_names()),
                 uuid="missing_action"
             ),
             MissingActionVectorMaskSensor(
@@ -80,16 +80,16 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
 
     @classmethod
     def tag(cls):
-        return "Pure-Pointnav-ma-iTHOR-RGBD-Internal-SimpleConv-DDPPO"
+        return "Pure-Pointnav-dc-iTHOR-RGBD-Internal-SimpleConv-DDPPO"
 
     @classmethod
     def training_pipeline(cls, **kwargs):
-        ppo_steps = int(10000000)
+        ppo_steps = int(40000000)
         lr = 3e-4
         num_mini_batch = 1
         update_repeats = 3
         num_steps = 30
-        save_interval = 1000000
+        save_interval = 5000000
         log_interval = 100
         gamma = 0.99
         use_gae = True
@@ -121,7 +121,7 @@ class PointNaviThorRGBPPOExperimentConfig(PointNaviThorBaseConfig):
     @classmethod
     def create_model(cls, **kwargs) -> nn.Module:
         return PointNavMAInternalActorCriticSimpleConvRNN(
-            action_space=gym.spaces.Discrete(len(PointNavMissingActionTask.class_action_names())),
+            action_space=gym.spaces.Discrete(len(PointNavDynamicsCorruptionTask.class_action_names())),
             observation_space=kwargs["observation_set"].observation_spaces,
             goal_sensor_uuid="target_coordinates_ind",
             hidden_size=512,
