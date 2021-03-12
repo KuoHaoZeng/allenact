@@ -1525,7 +1525,8 @@ class PointNavDynamicsCorruptionDatasetTaskSampler(TaskSampler):
         if not self.env.teleport(
                 pose=episode["initial_position"], rotation=episode["initial_orientation"]
         ):
-            return self.next_task()
+            if int(scene.split("_")[0][-2:]) < 21:
+                return self.next_task()
 
         self.env.initialize(0.25, renderObjectImage=True, renderDepthImage=True)
 

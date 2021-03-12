@@ -37,6 +37,7 @@ class PointNaviThorBaseConfig(ObjectNavBaseConfig, ABC):
         #self.TRAIN_GPU_IDS = [1]
         self.VALID_GPU_IDS = [torch.cuda.device_count() - 1]
         self.TEST_GPU_IDS = [torch.cuda.device_count() - 1]
+        #self.TEST_GPU_IDS = [0]
 
         self.TRAIN_DATASET_DIR = os.path.join(
             ABS_PATH_OF_TOP_LEVEL_DIR, "datasets/ithor-pointnav-obstacles_v2/train"
