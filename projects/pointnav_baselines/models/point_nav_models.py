@@ -1169,7 +1169,7 @@ class PointNavPBLActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         self.visual_encoder = SimpleCNN(observation_space, hidden_size)
 
         self.state_encoder = RNNStateEncoder(
-            (0 if self.is_blind else self.recurrent_hidden_state_size) + 1,
+            (0 if self.is_blind else self.recurrent_hidden_state_size) + self.coorinate_embedding_size,
             self._hidden_size,
             num_layers=num_rnn_layers,
             rnn_type=rnn_type,
@@ -1256,11 +1256,12 @@ class PointNavPBLActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
             perception_embed = self.visual_encoder(observations)
             if self.sensor_fusion:
                 perception_embed = self.sensor_fuser(perception_embed)
+            x_obs = perception_embed
             x = torch.cat([perception_embed] + x, dim=-1)
-            x_obs = self.sensor_fuser_2(x)
+            #x_obs = self.sensor_fuser_2(x)
 
-        x = [x_obs] + [prev_actions.squeeze(-1)]
-        x = torch.cat(x, dim=-1)
+        #x = [x_obs] + [prev_actions.squeeze(-1)]
+        #x = torch.cat(x, dim=-1)
         x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
 
         out = ActorCriticOutput(
@@ -1319,7 +1320,7 @@ class PointNavCPCActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
         self.visual_encoder = SimpleCNN(observation_space, hidden_size)
 
         self.state_encoder = RNNStateEncoder(
-            (0 if self.is_blind else self.recurrent_hidden_state_size) + 1,
+            (0 if self.is_blind else self.recurrent_hidden_state_size) + self.coorinate_embedding_size,
             self._hidden_size,
             num_layers=num_rnn_layers,
             rnn_type=rnn_type,
@@ -1400,11 +1401,12 @@ class PointNavCPCActorCriticSimpleConvRNN(ActorCriticModel[CategoricalDistr]):
             perception_embed = self.visual_encoder(observations)
             if self.sensor_fusion:
                 perception_embed = self.sensor_fuser(perception_embed)
+            x_obs = perception_embed
             x = torch.cat([perception_embed] + x, dim=-1)
-            x_obs = self.sensor_fuser_2(x)
+            #x_obs = self.sensor_fuser_2(x)
 
-        x = [x_obs] + [prev_actions.squeeze(-1)]
-        x = torch.cat(x, dim=-1)
+        #x = [x_obs] + [prev_actions.squeeze(-1)]
+        #x = torch.cat(x, dim=-1)
         x, rnn_hidden_states = self.state_encoder(x, memory.tensor("rnn"), masks)
 
         out = ActorCriticOutput(

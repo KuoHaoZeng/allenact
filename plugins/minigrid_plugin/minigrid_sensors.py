@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from babyai.utils.format import InstructionsPreprocessor
 from gym_minigrid.minigrid import MiniGridEnv
+from plugins.minigrid_plugin.minigrid_environments import DynamicsCorruptionEmpty
+from plugins.minigrid_plugin.minigrid_tasks import DynamicsCorruptionEmptyTask
 
 from core.base_abstractions.sensor import Sensor, prepare_locals_for_super
 from core.base_abstractions.task import Task, SubTaskType
@@ -131,3 +133,25 @@ class MiniGridMissionSensor(Sensor[MiniGridEnv, Task[MiniGridEnv]]):
             )
 
         return out.long().numpy()
+
+class MissingActionSensor(Sensor):
+    def __init__(
+            self,
+            nactions: int,
+            uuid: str = "missing_action",
+            **kwargs: Any
+    ) -> None:
+        self.nactions = nactions
+        observation_space = self._get_observation_space()
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def _get_observation_space(self) -> gym.spaces.Tuple:
+        return gym.spaces.Discrete(self.nactions + 1)
+
+
+    def get_observation(
+            self, env: DynamicsCorruptionEmpty, task: Optional[DynamicsCorruptionEmptyTask], *args: Any, **kwargs: Any
+    ) -> Any:
+        missing_action = task._ACTION_MINIGRID_IND_TO_IND[env.current_corruption_actions[0]]
+        return missing_action

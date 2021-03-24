@@ -6,7 +6,7 @@ import gym
 import networkx as nx
 import numpy as np
 from gym.utils import seeding
-from gym_minigrid.envs import CrossingEnv
+from gym_minigrid.envs import CrossingEnv, DynamicsCorruptionEmptyEnv
 from gym_minigrid.minigrid import (
     DIR_TO_VEC,
     IDX_TO_OBJECT,
@@ -17,7 +17,7 @@ from gym_minigrid.minigrid import (
 from core.base_abstractions.misc import RLStepResult
 from core.base_abstractions.sensor import Sensor, SensorSuite
 from core.base_abstractions.task import Task, TaskSampler
-from plugins.minigrid_plugin.minigrid_environments import AskForHelpSimpleCrossing
+from plugins.minigrid_plugin.minigrid_environments import AskForHelpSimpleCrossing, DynamicsCorruptionEmpty
 from utils.system import get_logger
 
 
@@ -33,7 +33,7 @@ class MiniGridTask(Task[CrossingEnv]):
 
     def __init__(
         self,
-        env: Union[CrossingEnv],
+        env: Union[CrossingEnv, DynamicsCorruptionEmptyEnv],
         sensors: Union[SensorSuite, List[Sensor]],
         task_info: Dict[str, Any],
         max_steps: int,
@@ -372,6 +372,72 @@ class AskForHelpSimpleCrossingTask(MiniGridTask):
             "toggle_percent": float(
                 sum(self.did_toggle) / max(len(self.did_toggle), 1)
             ),
+        }
+
+
+class DynamicsCorruptionEmptyTask(MiniGridTask):
+    _ACTION_NAMES = ("left", "right", "forward", "back")
+    _ACTION_IND_TO_MINIGRID_IND = tuple(
+        MiniGridEnv.Actions.__members__[name].value for name in _ACTION_NAMES
+    )
+    _ACTION_MINIGRID_IND_TO_IND = {}
+    for I, A in enumerate(_ACTION_IND_TO_MINIGRID_IND):
+        _ACTION_MINIGRID_IND_TO_IND[A] = I
+    _CACHED_GRAPHS: Dict[str, nx.DiGraph] = {}
+
+    def __init__(
+            self,
+            env: DynamicsCorruptionEmpty,
+            sensors: Union[SensorSuite, List[Sensor]],
+            task_info: Dict[str, Any],
+            max_steps: int,
+            **kwargs,
+    ):
+        super().__init__(
+            env=env, sensors=sensors, task_info=task_info, max_steps=max_steps, **kwargs
+        )
+
+        self.reward_configs = kwargs["reward_configs"]
+        self.last_missing_action_made = False
+        self.did_toggle: List[bool] = []
+
+    def _step(self, action: Union[int, Sequence[int]]) -> RLStepResult:
+        # if self.num_steps_taken() == 0:
+        #     self.env.render()
+        assert isinstance(action, int)
+        action = cast(int, action)
+
+        if action in self.env.current_corruption_actions:
+            self.last_missing_action_made = True
+
+        minigrid_obs, reward, self._minigrid_done, info = self.env.step(
+            action=self._ACTION_IND_TO_MINIGRID_IND[action]
+        )
+
+        # self.env.render()
+        if "missing_action_penalty" in self.reward_configs.keys():
+            reward += self.shaping_by_missing_action(self.reward_configs["missing_action_penalty"])
+
+        return RLStepResult(
+            observation=self.get_observations(minigrid_output_obs=minigrid_obs),
+            reward=reward,
+            done=self.is_done(),
+            info=info,
+        )
+
+    def shaping_by_missing_action(self, penalty) -> float:
+        if self.last_missing_action_made:
+            self.last_missing_action_made = False
+            return penalty
+        else:
+            return 0
+
+    def metrics(self) -> Dict[str, Any]:
+        return {
+            **super(DynamicsCorruptionEmptyTask, self).metrics(),
+            "num_missing_action": self.env.num_missing_action_made,
+            "missing_action_ratio": self.env.num_missing_action_made / float(self.env.num_action_made),
+            "size": self.env.size,
         }
 
 

@@ -3,7 +3,7 @@ from typing import Optional, Set
 
 import numpy as np
 from gym import register
-from gym_minigrid.envs import CrossingEnv
+from gym_minigrid.envs import CrossingEnv, DynamicsCorruptionEmptyEnv
 from gym_minigrid.minigrid import Lava, Wall
 
 
@@ -166,6 +166,116 @@ class AskForHelpSimpleCrossing(CrossingEnv):
         self.init_agent_dir = self.agent_dir
         self._was_successful = False
         self.should_reveal_image = False
+
+
+class DynamicsCorruptionEmpty(DynamicsCorruptionEmptyEnv):
+    """Corresponds to WC FAULTY SWITCH environment."""
+
+    def __init__(
+            self,
+            size=9,
+            corruption_actions=[0,1,2,8],
+            num_corruption_actions=1,
+            max_steps=100,
+            agent_view_size=5,
+            seed=None,
+            exploration_reward: Optional[float] = None,
+            death_penalty: Optional[float] = None,
+    ):
+        self.size = size
+        self.init_agent_pos: Optional[np.ndarray] = None
+        self.init_agent_dir: Optional[int] = None
+        self.exploration_reward = exploration_reward
+        self.death_penalty = death_penalty
+        self.num_action_made = 0
+        self.num_missing_action_made = 0
+
+        self.explored_points: Set = set()
+        self._was_successful = False
+
+        self.step_count: Optional[int] = None
+
+        super(DynamicsCorruptionEmpty, self).__init__(
+            size=size,
+            corruption_actions=corruption_actions,
+            num_corruption_actions=num_corruption_actions,
+            max_steps=max_steps,
+            agent_view_size=agent_view_size,
+            seed=seed,
+            agent_start_pos=None,
+        )
+
+    @property
+    def was_successful(self) -> bool:
+        return self._was_successful
+
+    def metrics(self):
+        return {
+            "explored_count": len(self.explored_points),
+            "final_distance": self.distance_to_goal,
+        }
+
+    def step(self, action: int):
+        minigrid_obs, reward, done, info = super(DynamicsCorruptionEmpty, self).step(
+            action=action
+        )
+
+        self.num_action_made += 1
+        if action in self.current_corruption_actions:
+            self.num_missing_action_made += 1
+
+        assert not self._was_successful, "Called step after done."
+        self._was_successful = self._was_successful or (reward > 0)
+
+        if (
+                done
+                and self.steps_remaining != 0
+                and (not self._was_successful)
+                and self.death_penalty is not None
+        ):
+            reward += self.death_penalty
+
+        t = tuple(self.agent_pos)
+        if self.exploration_reward is not None:
+            if t not in self.explored_points:
+                reward += self.exploration_reward
+        self.explored_points.add(t)
+
+        return minigrid_obs, reward, done, info
+
+    def same_seed_reset(self):
+        assert self.init_agent_pos is not None
+        self._was_successful = False
+
+        # Current position and direction of the agent
+        self.agent_pos = self.init_agent_pos
+        self.agent_dir = self.init_agent_dir
+
+        self.explored_points.clear()
+        self.explored_points.add(tuple(self.agent_pos))
+
+        # Check that the agent doesn't overlap with an object
+        start_cell = self.grid.get(*self.agent_pos)
+        assert start_cell is None or start_cell.can_overlap()
+
+        assert self.carrying is None
+
+        # Step count since episode start
+        self.step_count = 0
+
+        # Return first observation
+        obs = self.gen_obs()
+        return obs
+
+    def reset(self, partial_reset: bool = False):
+        super(DynamicsCorruptionEmpty, self).reset()
+        self.explored_points.clear()
+        self.explored_points.add(tuple(self.agent_pos))
+        self.init_agent_pos = copy.deepcopy(self.agent_pos)
+        self.init_agent_dir = self.agent_dir
+        self._was_successful = False
+        self.num_action_made = 0
+        self.num_missing_action_made = 0
 
 
 class LavaCrossingS25N10(CrossingEnv):
