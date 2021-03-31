@@ -205,6 +205,8 @@ class DynamicsCorruptionEmpty(DynamicsCorruptionEmptyEnv):
             agent_start_pos=None,
         )
 
+        self.prev_obs = self.gen_obs()
+
     @property
     def was_successful(self) -> bool:
         return self._was_successful
@@ -215,7 +217,11 @@ class DynamicsCorruptionEmpty(DynamicsCorruptionEmptyEnv):
             "final_distance": self.distance_to_goal,
         }
 
+    def gen_prev_obs(self):
+        return self.prev_obs
+
     def step(self, action: int):
+        self.prev_obs = self.gen_obs()
         minigrid_obs, reward, done, info = super(DynamicsCorruptionEmpty, self).step(
             action=action
         )

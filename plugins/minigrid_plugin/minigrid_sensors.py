@@ -82,6 +82,64 @@ class EgocentricMiniGridSensor(Sensor[MiniGridEnv, Task[MiniGridEnv]]):
         return img
 
 
+class PrevEgocentricMiniGridSensor(Sensor[MiniGridEnv, Task[MiniGridEnv]]):
+    def __init__(
+            self,
+            agent_view_size: int,
+            view_channels: int = 1,
+            uuid: str = "prev_minigrid_ego_image",
+            **kwargs: Any
+    ):
+        self.agent_view_size = agent_view_size
+        self.view_channels = view_channels
+        self.num_objects = (
+                typing.cast(
+                    int, max(map(abs, gym_minigrid.minigrid.OBJECT_TO_IDX.values()))  # type: ignore
+                )
+                + 1
+        )
+        self.num_colors = (
+                typing.cast(int, max(map(abs, gym_minigrid.minigrid.COLOR_TO_IDX.values())))  # type: ignore
+                + 1
+        )
+        self.num_states = (
+                typing.cast(int, max(map(abs, gym_minigrid.minigrid.STATE_TO_IDX.values())))  # type: ignore
+                + 1
+        )
+
+        observation_space = self._get_observation_space()
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def _get_observation_space(self) -> gym.Space:
+        return gym.spaces.Box(
+            low=0,
+            high=max(self.num_objects, self.num_colors, self.num_states) - 1,
+            shape=(self.agent_view_size, self.agent_view_size, self.view_channels),
+            dtype=int,
+        )
+
+    def get_observation(
+            self,
+            env: MiniGridEnv,
+            task: Optional[SubTaskType],
+            *args,
+            minigrid_output_obs: Optional[np.ndarray] = None,
+            **kwargs: Any
+    ) -> Any:
+        if minigrid_output_obs is not None and minigrid_output_obs["image"].shape == (
+                self.agent_view_size,
+                self.agent_view_size,
+        ):
+            img = minigrid_output_obs["image"][:, :, : self.view_channels]
+        else:
+            env.agent_view_size = self.agent_view_size
+            img = env.gen_prev_obs()["image"][:, :, : self.view_channels]
+
+        assert img.dtype == np.uint8
+        return img
+
+
 class MiniGridMissionSensor(Sensor[MiniGridEnv, Task[MiniGridEnv]]):
     def __init__(self, instr_len: int, uuid: str = "minigrid_mission", **kwargs: Any):
 
@@ -155,3 +213,27 @@ class MissingActionSensor(Sensor):
     ) -> Any:
         missing_action = task._ACTION_MINIGRID_IND_TO_IND[env.current_corruption_actions[0]]
         return missing_action
+
+class MissingActionOneHotSensor(Sensor):
+    def __init__(
+            self,
+            nactions: int,
+            uuid: str = "missing_action",
+            **kwargs: Any
+    ) -> None:
+        self.nactions = nactions
+        observation_space = self._get_observation_space()
+
+        super().__init__(**prepare_locals_for_super(locals()))
+
+    def _get_observation_space(self) -> gym.spaces.Tuple:
+        return gym.spaces.Discrete(self.nactions + 1)
+
+
+    def get_observation(
+            self, env: DynamicsCorruptionEmpty, task: Optional[DynamicsCorruptionEmptyTask], *args: Any, **kwargs: Any
+    ) -> Any:
+        missing_action = task._ACTION_MINIGRID_IND_TO_IND[env.current_corruption_actions[0]]
+        out = np.zeros(self.nactions + 1)
+        out[missing_action] = 1
+        return out
