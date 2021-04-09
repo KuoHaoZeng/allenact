@@ -73,7 +73,7 @@ class MiniGridMAExperimentConfig(MiniGridTutorialExperimentConfig):
     @classmethod
     def machine_params(cls, mode="train", **kwargs) -> Dict[str, Any]:
         return {
-            "nprocesses": 128 if mode == "train" else 16,
+            "nprocesses": 128 if mode == "train" else 1,
             "gpu_ids": [0],
         }
 

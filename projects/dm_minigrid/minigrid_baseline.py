@@ -22,9 +22,12 @@ class MiniGridTutorialExperimentConfig(ExperimentConfig):
         super().__init__()
         self.ENV_ARGS = dict(
             size=11,
-            corruption_actions=[0,1,2,8],
+            corruption_actions=[-1,0,1,2,8],
+            num_corruption_changes=2,
             num_corruption_actions=1,
             max_steps=50,
+            n_obstacles=0,
+            is_obstacles_movable=False,
             agent_view_size=5,
         )
         self.REWARD_CONFIG = dict(missing_action_penalty=0)

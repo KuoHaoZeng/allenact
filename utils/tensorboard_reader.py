@@ -63,14 +63,17 @@ if __name__ == "__main__":
     # plot with upper and lower bound
     for tag in tags:
         if tag.split("/")[0] == "valid":
-            ax, fig = plot_many_series(output, tag, 3, plot_mean_with_upper_and_lower, labels=labels)
+            #ax, fig = plot_many_series(output, tag, 3, plot_mean_with_upper_and_lower, labels=labels)
+            ax, fig = plot_many_series(output, tag, 3, plot_mean_with_std, labels=labels)
         else:
-            ax, fig = plot_many_series(output, tag, 3, plot_smooth_mean_with_upper_and_lower, labels=labels)
+            #ax, fig = plot_many_series(output, tag, 3, plot_smooth_mean_with_upper_and_lower, labels=labels)
+            ax, fig = plot_many_series(output, tag, 3, plot_smooth_mean_with_std, labels=labels)
         ax.legend(loc=4, fontsize=font_size)
         ax.set_ylabel(tag, fontsize=font_size)
         ax.set_xlabel("Number of Training", fontsize=font_size)
         plt.yticks(fontsize=font_size)
         plt.xticks(fontsize=font_size)
         plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 6))
-        name = "{}/{}_{}_mul.png".format(root, tag.split("/")[0], tag.split("/")[1])
+        #name = "{}/{}_{}_mul.png".format(root, tag.split("/")[0], tag.split("/")[1])
+        name = "{}/{}_{}_ppo_robot_model_2_ms.png".format(root, tag.split("/")[0], tag.split("/")[1])
         plt.savefig(name)

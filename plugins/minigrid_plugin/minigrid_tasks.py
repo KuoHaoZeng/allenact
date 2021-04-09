@@ -20,6 +20,8 @@ from core.base_abstractions.task import Task, TaskSampler
 from plugins.minigrid_plugin.minigrid_environments import AskForHelpSimpleCrossing, DynamicsCorruptionEmpty
 from utils.system import get_logger
 
+from PIL import Image
+import os
 
 class MiniGridTask(Task[CrossingEnv]):
     _ACTION_NAMES: Tuple[str, ...] = ("left", "right", "forward")
@@ -401,6 +403,15 @@ class DynamicsCorruptionEmptyTask(MiniGridTask):
         self.last_missing_action_made = False
         self.did_toggle: List[bool] = []
 
+        if False:
+            root = "storage/Dynamics_Corruption/mini_grid/qualitative_results/{}".format(
+                self._ACTION_MINIGRID_IND_TO_IND[self.env.current_corruption_actions[0]])
+            if not os.path.isdir(root):
+                os.mkdir(root)
+            ds = os.listdir(root)
+            self.root = "{}/{}".format(root, len(ds) + 1)
+            os.mkdir(self.root)
+
     def _step(self, action: Union[int, Sequence[int]]) -> RLStepResult:
         # if self.num_steps_taken() == 0:
         #     self.env.render()
@@ -417,6 +428,10 @@ class DynamicsCorruptionEmptyTask(MiniGridTask):
         # self.env.render()
         if "missing_action_penalty" in self.reward_configs.keys():
             reward += self.shaping_by_missing_action(self.reward_configs["missing_action_penalty"])
+
+        if False:
+            whole_world = Image.fromarray(self.env.render(mode=""))
+            whole_world.save("{}/{}.png".format(self.root, self.env.num_action_made))
 
         return RLStepResult(
             observation=self.get_observations(minigrid_output_obs=minigrid_obs),

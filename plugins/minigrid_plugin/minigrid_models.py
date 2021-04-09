@@ -18,6 +18,8 @@ from core.base_abstractions.distributions import CategoricalDistr
 from core.models.basic_models import LinearActorCritic, RNNActorCritic, RNNStateEncoder
 from utils.misc_utils import prepare_locals_for_super
 
+import os
+import numpy as np
 
 class MiniGridSimpleConvBase(ActorCriticModel[CategoricalDistr], abc.ABC):
     actor_critic: ActorCriticModel
@@ -536,6 +538,14 @@ class MiniGridMAInternalSimpleConvRNN(MiniGridSimpleConvBase):
         mem_return = mem_return.set_tensor("internal", internal_model_states)
 
         self.observations_for_ac[self.ac_key] = None
+
+        if False:
+            missing_action_gt = observations["missing_action"].squeeze().detach().cpu().numpy().argmax()
+            root = "storage/Dynamics_Corruption/mini_grid/qualitative_results/{}".format(missing_action_gt)
+            ds = os.listdir(root)
+            root = "{}/{}".format(root, len(ds))
+            l = len([ele for ele in os.listdir(root) if ele.endswith(".npy")])
+            np.save("{}/{}.npy".format(root, l+1), internal_feats.squeeze().detach().cpu().numpy())
 
         return out, mem_return
 
